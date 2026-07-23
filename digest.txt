@@ -1,0 +1,1344 @@
+Directory structure:
+└── frigus-server/
+    ├── Cargo.toml
+    └── src/
+        ├── character.rs
+        ├── client.rs
+        ├── command.rs
+        ├── config.rs
+        ├── format.rs
+        ├── heartbeat.rs
+        ├── main.rs
+        ├── server.rs
+        └── session.rs
+
+================================================
+FILE: Cargo.toml
+================================================
+[package]
+name = "frigus-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+colored = "3.1.1"
+reqwest = { version = "0.13.4", features = ["json"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.19"
+tokio = { version = "1.53.1", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+
+
+
+================================================
+FILE: src/character.rs
+================================================
+use colored::*;
+use serde_json::{Value, json};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+
+pub struct CharacterWizard;
+
+impl CharacterWizard {
+    pub async fn run<R, W>(
+        lines: &mut R,
+        writer: &mut W,
+        actor: &str,
+    ) -> Result<Value, Box<dyn std::error::Error + Send + Sync>>
+    where
+        R: AsyncBufReadExt + Unpin,
+        W: AsyncWriteExt + Unpin,
+    {
+        let banner = format!(
+            "\n{}\n  {} [{}]\n{}\n",
+            "==================================================================".cyan(),
+            "CHARACTER CREATION WIZARD: Creating adventurer"
+                .yellow()
+                .bold(),
+            actor.cyan().bold(),
+            "==================================================================".cyan()
+        );
+        writer.write_all(banner.as_bytes()).await?;
+
+        let gender_options = vec!["male", "female", "nonbinary"];
+        let gender_idx = Self::select_menu(
+            writer,
+            lines,
+            "Select Your Character Gender:",
+            &gender_options,
+        )
+        .await?;
+        let gender = gender_options[gender_idx].to_string();
+
+        let race_options = vec![
+            "human",
+            "elf",
+            "dwarf",
+            "orc",
+            "goblin",
+            "halfling",
+            "draconian",
+            "beastkin",
+            "merfolk",
+            "golem",
+            "undead",
+            "troll",
+            "gnome",
+            "tiefling",
+            "giant",
+            "demigod [RESTRICTED]",
+            "angel [RESTRICTED]",
+            "demon [RESTRICTED]",
+        ];
+
+        let race_idx =
+            Self::select_menu(writer, lines, "Choose Your Lineage / Race:", &race_options).await?;
+        let raw_race = race_options[race_idx].split_whitespace().next().unwrap();
+        let race = raw_race.to_string();
+
+        let is_restricted = matches!(race.as_str(), "demigod" | "angel" | "demon");
+        let mut secret_password = String::new();
+
+        if is_restricted {
+            let prompt_text = format!(
+                "\n{} Race '{}' requires a secret master key: ",
+                "RESTRICTED GATEWAY:".red().bold(),
+                race.yellow().bold()
+            );
+            writer.write_all(prompt_text.as_bytes()).await?;
+            secret_password = Self::read_line(lines).await?;
+        }
+
+        let class_options = vec!["fighter", "wizard", "rogue", "cleric"];
+        let class_idx = Self::select_menu(
+            writer,
+            lines,
+            "Select Your Class Specialization:",
+            &class_options,
+        )
+        .await?;
+        let class = class_options[class_idx].to_string();
+
+        let (str_val, dex_val, con_val, int_val, wis_val, cha_val, luk_val) =
+            Self::allocate_stats(writer, lines, is_restricted).await?;
+
+        let weapon_options = vec![
+            "sword",
+            "dagger",
+            "staff",
+            "shortbow",
+            "wooden_club",
+            "bronze_sword",
+            "bronze_dagger",
+            "fists",
+        ];
+        let wpn_idx = Self::select_menu(
+            writer,
+            lines,
+            "Choose Your Starting Weapon:",
+            &weapon_options,
+        )
+        .await?;
+        let starting_weapon = weapon_options[wpn_idx].to_string();
+
+        let summary = format!(
+            "\n{}\n  {} {}\n  Gender: {}\n  Race:   {}\n  Class:  {}\n  Weapon: {}\n  Stats:  STR:{} DEX:{} CON:{} INT:{} WIS:{} CHA:{} LUK:{}\n{}\nIs this character ready? (y/n): ",
+            "------------------- CHARACTER SUMMARY -------------------".cyan(),
+            "Name:  ".yellow().bold(),
+            actor.bold(),
+            gender.cyan(),
+            race.yellow(),
+            class.green(),
+            starting_weapon.magenta(),
+            str_val,
+            dex_val,
+            con_val,
+            int_val,
+            wis_val,
+            cha_val,
+            luk_val,
+            "---------------------------------------------------------".cyan()
+        );
+        writer.write_all(summary.as_bytes()).await?;
+
+        let confirm = Self::read_line(lines).await?;
+        if !confirm.eq_ignore_ascii_case("y") && !confirm.eq_ignore_ascii_case("yes") {
+            writer.write_all(b"Restarting wizard...\n").await?;
+            return Box::pin(Self::run(lines, writer, actor)).await;
+        }
+
+        Ok(json!({
+            "type": "create_player",
+            "race": race,
+            "class": class,
+            "gender": gender,
+            "str": str_val,
+            "dex": dex_val,
+            "con": con_val,
+            "int": int_val,
+            "wis": wis_val,
+            "cha": cha_val,
+            "luk": luk_val,
+            "starting_weapon": starting_weapon,
+            "secret_password": secret_password
+        }))
+    }
+
+    async fn allocate_stats<R, W>(
+        writer: &mut W,
+        lines: &mut R,
+        is_restricted: bool,
+    ) -> Result<(i64, i64, i64, i64, i64, i64, i64), Box<dyn std::error::Error + Send + Sync>>
+    where
+        R: AsyncBufReadExt + Unpin,
+        W: AsyncWriteExt + Unpin,
+    {
+        let initial_points: i64 = if is_restricted { 300 } else { 15 };
+        let mut points_left = initial_points;
+        let mut stats = [10i64; 7];
+        let stat_names = ["STR", "DEX", "CON", "INT", "WIS", "CHA", "LUK"];
+        let inc_amount = if is_restricted { 10 } else { 1 };
+
+        loop {
+            let mut prompt = format!(
+                "\n{}\nBonus Points Remaining: [{}]\n",
+                "--- ATTRIBUTE POINT DISTRIBUTION ---".yellow().bold(),
+                points_left.to_string().cyan().bold()
+            );
+
+            for (i, name) in stat_names.iter().enumerate() {
+                prompt.push_str(&format!("  {}) {}: {}\n", i + 1, name.bold(), stats[i]));
+            }
+            prompt.push_str("  8) Reset All Points\n");
+            prompt.push_str("  9) Confirm Attributes\n");
+            prompt.push_str(&format!(
+                "Select attribute to add {} point(s) (1-9): ",
+                inc_amount
+            ));
+
+            writer.write_all(prompt.as_bytes()).await?;
+            let choice_str = Self::read_line(lines).await?;
+
+            match choice_str.trim() {
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" => {
+                    let idx: usize = choice_str.trim().parse::<usize>()? - 1;
+                    let add_amt = std::cmp::min(points_left, inc_amount);
+                    if add_amt > 0 {
+                        stats[idx] += add_amt;
+                        points_left -= add_amt;
+                    } else {
+                        writer.write_all(b"No remaining bonus points!\n").await?;
+                    }
+                }
+                "8" => {
+                    stats = [10i64; 7];
+                    points_left = initial_points;
+                }
+                "9" => {
+                    if points_left > 0 {
+                        writer
+                            .write_all(
+                                format!(
+                                    "You still have {} unspent points. Proceed anyway? (y/n): ",
+                                    points_left
+                                )
+                                .as_bytes(),
+                            )
+                            .await?;
+                        let ans = Self::read_line(lines).await?;
+                        if ans.eq_ignore_ascii_case("y") || ans.eq_ignore_ascii_case("yes") {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                _ => {
+                    writer.write_all(b"Invalid choice.\n").await?;
+                }
+            }
+        }
+
+        Ok((
+            stats[0], stats[1], stats[2], stats[3], stats[4], stats[5], stats[6],
+        ))
+    }
+
+    async fn select_menu<R, W>(
+        writer: &mut W,
+        lines: &mut R,
+        title: &str,
+        options: &[&str],
+    ) -> Result<usize, Box<dyn std::error::Error + Send + Sync>>
+    where
+        R: AsyncBufReadExt + Unpin,
+        W: AsyncWriteExt + Unpin,
+    {
+        loop {
+            let mut prompt = format!("\n{}\n", title.yellow().bold());
+            for (idx, opt) in options.iter().enumerate() {
+                prompt.push_str(&format!("  {}) {}\n", idx + 1, opt));
+            }
+            prompt.push_str(&format!("Select (1-{}): ", options.len()));
+
+            writer.write_all(prompt.as_bytes()).await?;
+            let input = Self::read_line(lines).await?;
+
+            if let Ok(num) = input.trim().parse::<usize>() {
+                if num >= 1 && num <= options.len() {
+                    return Ok(num - 1);
+                }
+            }
+            writer
+                .write_all(b"Invalid choice. Please try again.\n")
+                .await?;
+        }
+    }
+
+    async fn read_line<R>(lines: &mut R) -> Result<String, Box<dyn std::error::Error + Send + Sync>>
+    where
+        R: AsyncBufReadExt + Unpin,
+    {
+        let mut buf = String::new();
+        let bytes_read = lines.read_line(&mut buf).await?;
+        if bytes_read == 0 {
+            return Err("Client disconnected".into());
+        }
+        Ok(buf.trim().to_string())
+    }
+}
+
+
+
+================================================
+FILE: src/client.rs
+================================================
+use reqwest::Client;
+use serde_json::{Value, json};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ClientError {
+    #[error("Network failure: {0}")]
+    Network(#[from] reqwest::Error),
+
+    #[error("Engine error: {0}")]
+    Engine(String),
+}
+
+#[derive(Clone)]
+pub struct EngineClient {
+    http: Client,
+    url: String,
+}
+
+impl EngineClient {
+    pub fn new(url: impl Into<String>) -> Self {
+        Self {
+            http: Client::new(),
+            url: url.into(),
+        }
+    }
+
+    pub async fn step(&self, actor: &str, action: Value) -> Result<Vec<Value>, ClientError> {
+        let payload = json!({
+            "actor": actor,
+            "action": action
+        });
+
+        let response = self.http.post(&self.url).json(&payload).send().await?;
+        let body: Value = response.json().await?;
+
+        if let Some(err_msg) = body.get("error").and_then(|element| element.as_str()) {
+            return Err(ClientError::Engine(err_msg.to_string()));
+        }
+
+        let events = body
+            .get("events")
+            .and_then(|element| element.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        Ok(events)
+    }
+
+    pub async fn check_player_exists(&self, actor: &str) -> Result<bool, ClientError> {
+        let events = self.step(actor, json!({"type": "player_exists"})).await?;
+        for ev in events {
+            if let Some(obj) = ev.as_object() {
+                if obj.get("functor").and_then(|f| f.as_str()) == Some("player_status") {
+                    if let Some(args) = obj.get("args").and_then(|a| a.as_array()) {
+                        if args.len() >= 2 {
+                            let status = args[1]
+                                .get("args")
+                                .and_then(|a| a.as_array())
+                                .and_then(|a| a.first())
+                                .and_then(|s| s.as_str());
+                            return Ok(status == Some("exists"));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+}
+
+
+
+================================================
+FILE: src/command.rs
+================================================
+use serde_json::{Value, json};
+
+pub struct CommandParser;
+
+impl CommandParser {
+    pub fn parse(input: &str) -> Option<Value> {
+        let tokens: Vec<&str> = input.split_whitespace().collect();
+        if tokens.is_empty() {
+            return None;
+        }
+
+        let verb = tokens[0].to_lowercase();
+        match verb.as_str() {
+            "look" | "l" => Some(json!({"type": "look"})),
+            "north" | "n" => Some(json!({"type": "move", "dir": "north"})),
+            "south" | "s" => Some(json!({"type": "move", "dir": "south"})),
+            "help" | "h" | "?" => Some(json!({"type": "local_help"})),
+            "east" | "e" => Some(json!({"type": "move", "dir": "east"})),
+            "west" | "w" => Some(json!({"type": "move", "dir": "west"})),
+            "up" | "u" => Some(json!({"type": "move", "dir": "up"})),
+            "down" | "d" => Some(json!({"type": "move", "dir": "down"})),
+
+            "go" | "move" if tokens.len() > 1 => {
+                let direction = tokens[1];
+                Some(json!({"type": "move", "dir": direction}))
+            }
+
+            "kill" | "k" if tokens.len() > 1 => {
+                let target = tokens[1];
+                Some(json!({"type": "kill", "target": target}))
+            }
+
+            "cast" | "c" if tokens.len() > 1 => {
+                let spell = tokens[1];
+                let target = tokens.get(2).copied().unwrap_or(tokens[1]);
+                Some(json!({"type": "cast", "spell": spell, "target": target}))
+            }
+
+            "loot" | "get" | "take" if tokens.len() > 1 => {
+                let target = tokens[1];
+                Some(json!({"type": "loot", "target": target}))
+            }
+
+            "equip" if tokens.len() > 1 => {
+                let item = tokens[1];
+                Some(json!({"type": "equip", "item": item}))
+            }
+
+            "unequip" if tokens.len() > 1 => {
+                let slot = tokens[1];
+                Some(json!({"type": "unequip", "slot": slot}))
+            }
+
+            "use" if tokens.len() > 1 => {
+                let item = tokens[1];
+                Some(json!({"type": "use", "item": item}))
+            }
+
+            "talk" if tokens.len() > 1 => {
+                let target = tokens[1];
+                Some(json!({"type": "talk", "target": target}))
+            }
+
+            "stance" if tokens.len() > 1 => Some(json!({"type": "stance", "stance": tokens[1]})),
+
+            "fly" => {
+                let altitude = tokens.get(1).copied().unwrap_or("air");
+                Some(json!({"type": "fly", "altitude": altitude}))
+            }
+
+            "jump" => {
+                let dir = tokens.get(1).copied().unwrap_or("forward");
+                Some(json!({"type": "jump", "dir": dir}))
+            }
+
+            "hide" => Some(json!({"type": "hide"})),
+            "rest" => Some(json!({"type": "rest"})),
+            "sleep" => Some(json!({"type": "sleep"})),
+            "wake" => Some(json!({"type": "wake"})),
+            "pray" => Some(json!({"type": "pray"})),
+            "search" => Some(json!({"type": "search"})),
+            "till" => Some(json!({"type": "till"})),
+            "harvest" => Some(json!({"type": "harvest"})),
+            "disarm" => Some(json!({"type": "disarm"})),
+            "ignite" => Some(json!({"type": "ignite"})),
+
+            "train" if tokens.len() > 1 => {
+                let stat = tokens[1];
+                Some(json!({"type": "train", "stat": stat}))
+            }
+
+            "craft" if tokens.len() > 1 => {
+                let item = tokens[1];
+                Some(json!({"type": "craft", "item": item}))
+            }
+
+            "say" if tokens.len() > 1 => {
+                let message = tokens[1..].join(" ");
+                Some(json!({"type": "chat", "chan": "local", "msg": message}))
+            }
+
+            "gossip" | "chat" if tokens.len() > 1 => {
+                let message = tokens[1..].join(" ");
+                Some(json!({"type": "chat", "chan": "global", "msg": message}))
+            }
+
+            "tell" | "whisper" if tokens.len() > 2 => {
+                let recipient = tokens[1];
+                let message = tokens[2..].join(" ");
+                Some(json!({"type": "whisper", "target": recipient, "msg": message}))
+            }
+
+            "buy" if tokens.len() >= 3 => {
+                let target = tokens[1];
+                let item = tokens[2];
+                let qty = tokens
+                    .get(3)
+                    .and_then(|q| q.parse::<i64>().ok())
+                    .unwrap_or(1);
+                Some(json!({"type": "buy", "target": target, "item": item, "qty": qty}))
+            }
+
+            "sell" if tokens.len() >= 3 => {
+                let target = tokens[1];
+                let item = tokens[2];
+                let qty = tokens
+                    .get(3)
+                    .and_then(|q| q.parse::<i64>().ok())
+                    .unwrap_or(1);
+                Some(json!({"type": "sell", "target": target, "item": item, "qty": qty}))
+            }
+
+            _ => {
+                if input.starts_with('{') {
+                    serde_json::from_str::<Value>(input).ok()
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
+
+
+================================================
+FILE: src/config.rs
+================================================
+#[derive(Clone, Debug)]
+pub struct Config {
+    pub engine_url: String,
+    pub endpoint_url: String,
+    pub tick_interval_ms: u64,
+}
+
+impl Config {
+    const FALLBACK_URL: &str = "http://127.0.0.1:8080/step";
+    const FALLBACK_LISTEN: &str = "0.0.0.0:4000";
+
+    pub fn from_env() -> Self {
+        let resolve = |name: &str, default: &str| -> String {
+            let value = std::env::var(name);
+            let url = value.unwrap_or_else(|_| default.to_string());
+            url
+        };
+
+        let engine_url = resolve("PROLOG_URL", Self::FALLBACK_URL);
+        let endpoint_url = resolve("LISTEN_ADDRESS", Self::FALLBACK_LISTEN);
+
+        Self {
+            engine_url,
+            endpoint_url,
+            tick_interval_ms: 2000,
+        }
+    }
+}
+
+
+
+================================================
+FILE: src/format.rs
+================================================
+use colored::*;
+use serde_json::Value;
+
+pub enum Target {
+    Actor(String),
+    Combatants(String, String),
+    Multi(Vec<String>),
+    Global,
+}
+
+pub struct RenderedEvent {
+    pub target: Target,
+    pub text: String,
+    pub trigger_look: bool,
+}
+
+pub struct EventFormatter;
+
+impl EventFormatter {
+    pub fn render(current_actor: &str, event: &Value) -> Option<RenderedEvent> {
+        let (name, args) = Self::parse_term(event);
+
+        match name.as_str() {
+            "look" => Self::render_look(current_actor, &args),
+            "safe_zone" => Self::render_safe_zone(current_actor, &args),
+            "moved" => Self::render_moved(current_actor, &args),
+            "hit" | "crit" | "double_hit" | "backstab" => Self::render_combat_hit(&name, &args),
+            "miss" => Self::render_miss(&args),
+            "dodged" => Self::render_dodged(&args),
+            "dead" => Self::render_dead(&args),
+            "say" => Self::render_say(current_actor, &args),
+            "chat" => Self::render_chat(&args),
+            "looted" => Self::render_looted(current_actor, &args),
+            "equipped" => Self::render_equipped(current_actor, &args),
+            "used" => Self::render_used(current_actor, &args),
+            "lvl_up" => Self::render_lvl_up(current_actor, &args),
+            _ => Self::render_generic(current_actor, &name, &args),
+        }
+    }
+
+    pub fn banner() -> String {
+        let divider = "==================================================================".cyan();
+        let title = "             WELCOME TO THE FRIGUS MULTI-USER DUNGEON            "
+            .bold()
+            .yellow();
+        format!("{}\n{}\n{}\n", divider, title, divider)
+    }
+
+    fn parse_term(value: &Value) -> (String, Vec<Value>) {
+        if let Some(obj) = value.as_object() {
+            if let Some(functor) = obj.get("functor").and_then(|f| f.as_str()) {
+                let args = obj
+                    .get("args")
+                    .and_then(|a| a.as_array())
+                    .cloned()
+                    .unwrap_or_default();
+                return (functor.to_string(), args);
+            }
+            if obj.len() == 1 {
+                let (key, val) = obj.iter().next().unwrap();
+                if let Some(arr) = val.as_array() {
+                    return (key.clone(), arr.clone());
+                }
+            }
+        } else if let Some(string) = value.as_str() {
+            return (string.to_string(), vec![]);
+        }
+        ("unknown".to_string(), vec![])
+    }
+
+    fn format_id(value: &Value) -> String {
+        if let Some(s) = value.as_str() {
+            return s.to_string();
+        }
+        if let Some(obj) = value.as_object() {
+            if obj.get("functor").and_then(|f| f.as_str()) == Some("cell") {
+                if let Some(args) = obj.get("args").and_then(|a| a.as_array()) {
+                    if args.len() >= 3 {
+                        let x = args[0].as_i64().unwrap_or(0);
+                        let y = args[1].as_i64().unwrap_or(0);
+                        let z = args[2].as_i64().unwrap_or(0);
+                        return format!("cell({}, {}, {})", x, y, z);
+                    }
+                }
+            }
+        }
+        value.to_string()
+    }
+
+    fn format_list(value: &Value) -> String {
+        if let Some(arr) = value.as_array() {
+            if arr.is_empty() {
+                return "none".to_string();
+            }
+            let elements: Vec<String> = arr.iter().map(|item| Self::format_id(item)).collect();
+            return elements.join(", ");
+        }
+        Self::format_id(value)
+    }
+
+    fn format_items(value: &Value) -> String {
+        if let Some(arr) = value.as_array() {
+            if arr.is_empty() {
+                return "none".to_string();
+            }
+            let item_strings: Vec<String> = arr
+                .iter()
+                .map(|item| {
+                    let tag = item.get("tag").and_then(|t| t.as_str()).unwrap_or("item");
+                    let qty = item.get("qty").and_then(|q| q.as_i64()).unwrap_or(1);
+                    format!("{} ({}x)", tag, qty)
+                })
+                .collect();
+            return item_strings.join(", ");
+        }
+        "none".to_string()
+    }
+
+    fn render_look(actor: &str, args: &[Value]) -> Option<RenderedEvent> {
+        if args.len() < 7 {
+            return None;
+        }
+
+        let room_id = Self::format_id(&args[0]);
+        let desc = args[1].as_str().unwrap_or("");
+        let props = Self::format_list(&args[2]);
+        let exits = Self::format_list(&args[3]);
+        let players = Self::format_list(&args[4]);
+        let mobs = Self::format_list(&args[5]);
+        let items = Self::format_items(&args[6]);
+
+        let divider =
+            "======================================================================".cyan();
+        let sub_divider =
+            "----------------------------------------------------------------------".dimmed();
+        let location_hdr = format!("LOCATION: [{}]", room_id).yellow().bold();
+        let props_fmt = props.dimmed();
+        let desc_fmt = desc.white();
+        let exits_fmt = format!("Exits: {}", exits).green().bold();
+
+        let mut output = String::new();
+        output.push_str(&format!("\n{}\n", divider));
+        output.push_str(&format!("  {} {}\n", location_hdr, props_fmt));
+        output.push_str(&format!("{}\n", sub_divider));
+        output.push_str(&format!("  {}\n\n", desc_fmt));
+        output.push_str(&format!("  {}\n", exits_fmt));
+
+        if !players.is_empty() && players != "none" {
+            let label = "Players:".blue().bold();
+            output.push_str(&format!("  {} {}\n", label, players.blue()));
+        }
+        if !mobs.is_empty() && mobs != "none" {
+            let label = "Monsters:".red().bold();
+            output.push_str(&format!("  {} {}\n", label, mobs.red()));
+        }
+        if !items.is_empty() && items != "none" {
+            let label = "Items:".magenta().bold();
+            output.push_str(&format!("  {} {}\n", label, items.magenta()));
+        }
+        output.push_str(&format!("{}\n\n", divider));
+
+        Some(RenderedEvent {
+            target: Target::Actor(actor.to_string()),
+            text: output,
+            trigger_look: false,
+        })
+    }
+
+    fn render_moved(current_actor: &str, args: &[Value]) -> Option<RenderedEvent> {
+        if args.len() < 3 {
+            return None;
+        }
+
+        let actor = args[0].as_str().unwrap_or("");
+        let dir = args[1].as_str().unwrap_or("");
+        let room = Self::format_id(&args[2]);
+
+        if actor == current_actor {
+            let dir_fmt = dir.yellow();
+            let room_fmt = room.yellow();
+            let text = format!("You head {} to {}.\n", dir_fmt, room_fmt);
+
+            Some(RenderedEvent {
+                target: Target::Actor(actor.to_string()),
+                text,
+                trigger_look: true,
+            })
+        } else {
+            let actor_fmt = actor.cyan();
+            let text = format!("{} moves {}.\n", actor_fmt, dir);
+
+            Some(RenderedEvent {
+                target: Target::Actor(actor.to_string()),
+                text,
+                trigger_look: false,
+            })
+        }
+    }
+
+    fn render_combat_hit(hit_type_name: &str, args: &[Value]) -> Option<RenderedEvent> {
+        if args.len() < 3 {
+            return None;
+        }
+
+        let attacker = args[0].as_str().unwrap_or("");
+        let target = args[1].as_str().unwrap_or("");
+        let dmg = args[2].as_i64().unwrap_or(0);
+
+        let hit_label = match hit_type_name {
+            "crit" => "CRITICAL HIT!".red().bold(),
+            "double_hit" => "DOUBLE HIT!".yellow().bold(),
+            "backstab" => "BACKSTAB!".magenta().bold(),
+            _ => "hit".normal(),
+        };
+
+        let dmg_fmt = dmg.to_string().red().bold();
+        let attacker_fmt = attacker.bold();
+        let target_fmt = target.bold();
+
+        let text = format!(
+            "[COMBAT] {} {} {} for {} damage!\n",
+            attacker_fmt, hit_label, target_fmt, dmg_fmt
+        );
+
+        Some(RenderedEvent {
+            target: Target::Combatants(attacker.to_string(), target.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_miss(args: &[Value]) -> Option<RenderedEvent> {
+        if args.len() < 2 {
+            return None;
+        }
+
+        let attacker = args[0].as_str().unwrap_or("");
+        let target = args[1].as_str().unwrap_or("");
+        let text = format!("[COMBAT] {} swung at {} and MISSED!\n", attacker, target);
+
+        Some(RenderedEvent {
+            target: Target::Combatants(attacker.to_string(), target.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_dodged(args: &[Value]) -> Option<RenderedEvent> {
+        if args.len() < 2 {
+            return None;
+        }
+
+        let target = args[0].as_str().unwrap_or("");
+        let attacker = args[1].as_str().unwrap_or("");
+        let target_fmt = target.green();
+
+        let text = format!(
+            "[COMBAT] {} nimbly DODGED {}'s attack!\n",
+            target_fmt, attacker
+        );
+
+        Some(RenderedEvent {
+            target: Target::Combatants(attacker.to_string(), target.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_dead(args: &[Value]) -> Option<RenderedEvent> {
+        let target = args.get(0)?.as_str()?;
+        let alert = format!("*** {} HAS BEEN SLAIN! ***", target).red().bold();
+        let text = format!("{}\n", alert);
+
+        Some(RenderedEvent {
+            target: Target::Global,
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_say(actor: &str, args: &[Value]) -> Option<RenderedEvent> {
+        if args.len() < 2 {
+            return None;
+        }
+
+        let speaker = args[0].as_str().unwrap_or("");
+        let speech = args[1].as_str().unwrap_or("");
+        let speaker_fmt = speaker.yellow().bold();
+        let text = format!("{} says: \"{}\"\n", speaker_fmt, speech);
+
+        Some(RenderedEvent {
+            target: Target::Actor(actor.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_chat(args: &[Value]) -> Option<RenderedEvent> {
+        if args.len() < 4 {
+            return None;
+        }
+
+        let channel = args[0].as_str().unwrap_or("global");
+        let sender = args[1].as_str().unwrap_or("");
+        let message = args[2].as_str().unwrap_or("");
+        let raw_targets = args[3].as_array()?;
+
+        let targets: Vec<String> = raw_targets
+            .iter()
+            .filter_map(|item| item.as_str().map(|s| s.to_string()))
+            .collect();
+
+        let chan_fmt = channel.to_uppercase().cyan();
+        let sender_fmt = sender.bold();
+        let text = format!("[{}] {}: {}\n", chan_fmt, sender_fmt, message);
+
+        Some(RenderedEvent {
+            target: Target::Multi(targets),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_looted(actor: &str, args: &[Value]) -> Option<RenderedEvent> {
+        if args.len() < 3 {
+            return None;
+        }
+
+        let item = args[1].as_str().unwrap_or("");
+        let qty = args[2].as_i64().unwrap_or(1);
+        let item_fmt = item.magenta();
+        let text = format!("You picked up {}x {}.\n", qty, item_fmt);
+
+        Some(RenderedEvent {
+            target: Target::Actor(actor.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_equipped(actor: &str, args: &[Value]) -> Option<RenderedEvent> {
+        if args.len() < 3 {
+            return None;
+        }
+
+        let item = args[1].as_str().unwrap_or("");
+        let slot = args[2].as_str().unwrap_or("");
+        let item_fmt = item.green();
+        let slot_fmt = slot.yellow();
+        let text = format!("You equipped {} in slot [{}].\n", item_fmt, slot_fmt);
+
+        Some(RenderedEvent {
+            target: Target::Actor(actor.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_used(actor: &str, args: &[Value]) -> Option<RenderedEvent> {
+        let item = args.get(1)?.as_str()?;
+        let item_fmt = item.cyan();
+        let text = format!("You used {}.\n", item_fmt);
+
+        Some(RenderedEvent {
+            target: Target::Actor(actor.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_lvl_up(actor: &str, args: &[Value]) -> Option<RenderedEvent> {
+        let level = args.get(1)?.as_i64()?;
+        let banner = format!("★ CONGRATULATIONS! You reached Level {}! ★", level)
+            .yellow()
+            .bold();
+        let text = format!("{}\n", banner);
+
+        Some(RenderedEvent {
+            target: Target::Actor(actor.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_generic(actor: &str, name: &str, args: &[Value]) -> Option<RenderedEvent> {
+        let arg_strings: Vec<String> = args.iter().map(|item| Self::format_id(item)).collect();
+        let joined_args = arg_strings.join(", ");
+        let name_fmt = name.dimmed();
+        let args_fmt = joined_args.dimmed();
+        let text = format!("Event [{}]: {}\n", name_fmt, args_fmt);
+
+        Some(RenderedEvent {
+            target: Target::Actor(actor.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+
+    fn render_safe_zone(actor: &str, _args: &[Value]) -> Option<RenderedEvent> {
+        let text = format!(
+            "{}\n",
+            "Combat is strictly forbidden in this safe sanctuary zone!"
+                .yellow()
+                .bold()
+        );
+        Some(RenderedEvent {
+            target: Target::Actor(actor.to_string()),
+            text,
+            trigger_look: false,
+        })
+    }
+}
+
+
+
+================================================
+FILE: src/heartbeat.rs
+================================================
+use crate::client::EngineClient;
+use crate::config::Config;
+use serde_json::json;
+use tokio::time::{Duration, sleep};
+
+pub struct Heartbeat {
+    config: Config,
+    client: EngineClient,
+}
+
+impl Heartbeat {
+    pub fn new(config: Config, client: EngineClient) -> Self {
+        Self { config, client }
+    }
+
+    pub async fn run(&self) {
+        let mut tick_counter: u64 = 0;
+        let interval = Duration::from_millis(self.config.tick_interval_ms);
+
+        loop {
+            sleep(interval).await;
+            tick_counter += 1;
+
+            let system_tick = json!({"type": "tick"});
+            let _ = self.client.step("system", system_tick).await;
+
+            if tick_counter % 2 == 0 {
+                let ai_tick = json!({"type": "ai_tick"});
+                let _ = self.client.step("system", ai_tick).await;
+            }
+        }
+    }
+}
+
+
+
+================================================
+FILE: src/main.rs
+================================================
+mod character;
+mod client;
+mod command;
+mod config;
+mod format;
+mod heartbeat;
+mod server;
+mod session;
+
+use client::EngineClient;
+use config::Config;
+use heartbeat::Heartbeat;
+use server::Server;
+use session::SessionManager;
+use tracing::info;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
+
+    let config = Config::from_env();
+    let client = EngineClient::new(&config.engine_url);
+    let sessions = SessionManager::new();
+
+    info!("Starting Frigus MUD Gateway");
+    info!("Prolog Engine URL: {}", config.engine_url);
+
+    let heartbeat = Heartbeat::new(config.clone(), client.clone());
+    tokio::spawn(async move {
+        heartbeat.run().await;
+    });
+
+    let server = Server::new(config, client, sessions);
+    server.run().await?;
+
+    Ok(())
+}
+
+
+
+================================================
+FILE: src/server.rs
+================================================
+use crate::character::CharacterWizard;
+use crate::client::EngineClient;
+use crate::command::CommandParser;
+use crate::config::Config;
+use crate::format::{EventFormatter, Target};
+use crate::session::SessionManager;
+use colored::*;
+use serde_json::json;
+use std::net::SocketAddr;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc;
+use tracing::{error, info};
+
+pub struct Server {
+    config: Config,
+    client: EngineClient,
+    sessions: SessionManager,
+}
+
+impl Server {
+    pub fn new(config: Config, client: EngineClient, sessions: SessionManager) -> Self {
+        Self {
+            config,
+            client,
+            sessions,
+        }
+    }
+
+    pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let listener = TcpListener::bind(&self.config.endpoint_url).await?;
+        info!("MUD TCP Server listening on {}", self.config.endpoint_url);
+
+        loop {
+            let (socket, addr) = listener.accept().await?;
+            let client = self.client.clone();
+            let sessions = self.sessions.clone();
+
+            tokio::spawn(async move {
+                if let Err(err) = Self::handle_session(socket, addr, client, sessions).await {
+                    error!("Session error for {}: {}", addr, err);
+                }
+            });
+        }
+    }
+
+    async fn handle_session(
+        socket: TcpStream,
+        addr: SocketAddr,
+        client: EngineClient,
+        sessions: SessionManager,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let (reader, mut writer) = socket.into_split();
+        let mut lines = BufReader::new(reader);
+
+        writer
+            .write_all(EventFormatter::banner().as_bytes())
+            .await?;
+        writer
+            .write_all(b"\nEnter your character name / Actor ID: ")
+            .await?;
+
+        let mut name_input = String::new();
+        if lines.read_line(&mut name_input).await? == 0 {
+            return Ok(());
+        }
+
+        let actor = name_input.trim().to_string();
+
+        if actor.is_empty() {
+            writer
+                .write_all(b"Invalid character name. Disconnecting.\n")
+                .await?;
+            return Ok(());
+        }
+
+        name_input.clear();
+
+        let exists = client.check_player_exists(&actor).await?;
+
+        if !exists {
+            let creation_payload = CharacterWizard::run(&mut lines, &mut writer, &actor).await?;
+
+            match client.step(&actor, creation_payload).await {
+                Ok(_) => {
+                    writer
+                        .write_all(b"\nCharacter successfully created!\n")
+                        .await?;
+                }
+                Err(err) => {
+                    let err_text = format!("Character Creation Error: {}\n", err.to_string().red());
+                    writer.write_all(err_text.as_bytes()).await?;
+                    return Ok(());
+                }
+            }
+        } else {
+            let welcome = format!("\nWelcome back, {}!\n", actor.cyan().bold());
+            writer.write_all(welcome.as_bytes()).await?;
+        }
+
+        let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+        sessions.register(&actor, tx).await;
+        info!("Player '{}' connected from {}", actor, addr);
+
+        let mut writer_task = tokio::spawn(async move {
+            while let Some(msg) = rx.recv().await {
+                if writer.write_all(msg.as_bytes()).await.is_err() {
+                    break;
+                }
+            }
+        });
+
+        Self::execute_action(&client, sessions.clone(), &actor, json!({"type": "look"})).await;
+
+        name_input.clear();
+
+        loop {
+            tokio::select! {
+                line = lines.read_line(&mut name_input) => {
+                    match line {
+                        Ok(n) if n > 0 => {
+                            let input = name_input.trim();
+                            if input.is_empty() {
+                                name_input.clear();
+                                continue;
+                            }
+
+                            if input.eq_ignore_ascii_case("quit") || input.eq_ignore_ascii_case("exit") {
+                                sessions.send_to(&actor, "Farewell, adventurer!\n").await;
+                                break;
+                            }
+
+                            if let Some(action) = CommandParser::parse(input) {
+                                if action.get("type").and_then(|t| t.as_str()) == Some("local_help") {
+                                    let help_text = format!(
+                                        "\n{}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n{}\n",
+                                        "--- COMMAND HELP ---".cyan().bold(),
+                                        "look / l              - Inspect current room",
+                                        "n / s / e / w / u / d - Movement directions",
+                                        "go <exit>             - Move to custom exits (e.g. go forest)",
+                                        "get <item>            - Pick up item from floor (e.g. get hoe)",
+                                        "say <msg>             - Speak locally to everyone in room",
+                                        "quit / exit           - Safely exit the game",
+                                        "--------------------".cyan()
+                                    );
+                                    sessions.send_to(&actor, &help_text).await;
+                                } else {
+                                    Self::execute_action(&client, sessions.clone(), &actor, action).await;
+                                }
+                            } else {
+                                let err_text = format!("{}\n", "Unknown command. Type 'help' for assistance.".red());
+                                sessions.send_to(&actor, &err_text).await;
+                            }
+                            name_input.clear();
+                        }
+                        _ => break,
+                    }
+                }
+                _ = &mut writer_task => break,
+            }
+        }
+
+        sessions.unregister(&actor).await;
+        info!("Player '{}' disconnected", actor);
+        Ok(())
+    }
+
+    pub async fn execute_action(
+        client: &EngineClient,
+        sessions: SessionManager,
+        actor: &str,
+        action: serde_json::Value,
+    ) {
+        match client.step(actor, action).await {
+            Ok(events) => {
+                for event in events {
+                    if let Some(rendered) = EventFormatter::render(actor, &event) {
+                        match rendered.target {
+                            Target::Actor(actor_id) => {
+                                sessions.send_to(&actor_id, &rendered.text).await;
+                            }
+                            Target::Combatants(attacker, target) => {
+                                sessions
+                                    .broadcast_combat(&attacker, &target, &rendered.text)
+                                    .await;
+                            }
+                            Target::Multi(targets) => {
+                                for target in targets {
+                                    sessions.send_to(&target, &rendered.text).await;
+                                }
+                            }
+                            Target::Global => {
+                                sessions.broadcast(&rendered.text).await;
+                            }
+                        }
+
+                        if rendered.trigger_look {
+                            let look_action = json!({"type": "look"});
+                            Box::pin(Self::execute_action(
+                                client,
+                                sessions.clone(),
+                                actor,
+                                look_action,
+                            ))
+                            .await;
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                let err_text = format!("Engine Error: {}\n", err.to_string().red());
+                sessions.send_to(actor, &err_text).await;
+            }
+        }
+    }
+}
+
+
+
+================================================
+FILE: src/session.rs
+================================================
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{Mutex, mpsc};
+
+pub type MessageTx = mpsc::UnboundedSender<String>;
+
+#[derive(Clone, Default)]
+pub struct SessionManager {
+    sessions: Arc<Mutex<HashMap<String, MessageTx>>>,
+}
+
+impl SessionManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub async fn register(&self, actor: &str, tx: MessageTx) {
+        let mut map = self.sessions.lock().await;
+        map.insert(actor.to_string(), tx);
+    }
+
+    pub async fn unregister(&self, actor: &str) {
+        let mut map = self.sessions.lock().await;
+        map.remove(actor);
+    }
+
+    pub async fn send_to(&self, actor: &str, message: &str) {
+        let map = self.sessions.lock().await;
+        if let Some(tx) = map.get(actor) {
+            let _ = tx.send(message.to_string());
+        }
+    }
+
+    pub async fn broadcast(&self, message: &str) {
+        let map = self.sessions.lock().await;
+        for tx in map.values() {
+            let _ = tx.send(message.to_string());
+        }
+    }
+
+    pub async fn broadcast_combat(&self, attacker: &str, target: &str, message: &str) {
+        self.send_to(attacker, message).await;
+        self.send_to(target, message).await;
+    }
+}
+
+
