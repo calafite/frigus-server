@@ -178,29 +178,24 @@ impl WsProxy {
             };
 
             let kind = parsed.get("type").and_then(|t| t.as_str());
-            if kind != Some("cmd") {
-                continue;
-            }
 
-            let raw_cmd = match parsed.get("text").and_then(|t| t.as_str()) {
-                Some(c) => c,
-                None => continue,
-            };
-
-            let action = match CmdParser::parse(raw_cmd) {
-                Some(a) => a,
-                None => {
-                    Self::send_err(&msg_tx, "Unknown command.");
-                    continue;
+            let action = if kind == Some("cmd") {
+                let raw_cmd = match parsed.get("text").and_then(|t| t.as_str()) {
+                    Some(c) => c,
+                    None => continue,
+                };
+                match CmdParser::parse(raw_cmd) {
+                    Some(a) => a,
+                    None => {
+                        Self::send_err(&msg_tx, "Unknown command.");
+                        continue;
+                    }
                 }
-            };
-
-            let act_type = action.get("type").and_then(|t| t.as_str());
-            if act_type == Some("local_help") {
-                let help_txt = "Commands: n, s, e, w, u, d, look, status, inventory, bounty, pay, time, kill, cast, get, equip, unequip, use, train";
-                Self::send_err(&msg_tx, help_txt);
+            } else if kind.is_some() {
+                parsed.clone()
+            } else {
                 continue;
-            }
+            };
 
             let payload = json!({ "actor": user, "action": action });
             let eng_msg = EngineNode::encode(&payload);

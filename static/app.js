@@ -638,15 +638,13 @@ class GameEngine {
       }
 
       case "respawned":
-        if (args[0] === this.currentActor) {
-          document.getElementById("death-overlay").style.display = "none";
-          ui.log(
-            `✨ <strong>You have been reborn in the Sanctuary.</strong>`,
-            "msg-magic",
-          );
-          this.send({ type: "cmd", text: "look" });
-          this.send({ type: "cmd", text: "status" });
-        }
+        document.getElementById("death-overlay").style.display = "none";
+        ui.log(
+          `✨ <strong>You have been reborn in the Sanctuary.</strong>`,
+          "msg-magic",
+        );
+        this.send({ type: "cmd", text: "look" });
+        this.send({ type: "cmd", text: "status" });
         break;
 
       // --- Items, Progression & Crime (RESTORED) ---

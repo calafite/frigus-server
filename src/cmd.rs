@@ -17,6 +17,7 @@ impl CmdParser {
             "bounty" | "bounties" | "leaderboard" => Self::base("bounty"),
             "pay" | "pay_bounty" | "pardon" => Self::base("pay_bounty"),
             "time" | "weather" | "env" => Self::base("time"),
+            "respawn" => Self::base("respawn"),
             "help" | "h" | "?" => Self::base("local_help"),
             "north" | "n" => Self::dir("north"),
             "south" | "s" => Self::dir("south"),
