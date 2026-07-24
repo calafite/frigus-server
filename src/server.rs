@@ -1,4 +1,3 @@
-use crate::character::CharacterWizard;
 use crate::client::EngineClient;
 use crate::command::CommandParser;
 use crate::config::Config;
@@ -76,23 +75,12 @@ impl Server {
 
         name_input.clear();
 
-        let exists = client.check_player_exists(&actor).await?;
+        let status = client.ensure_player(&actor).await?;
 
-        if !exists {
-            let creation_payload = CharacterWizard::run(&mut lines, &mut writer, &actor).await?;
-
-            match client.step(&actor, creation_payload).await {
-                Ok(_) => {
-                    writer
-                        .write_all(b"\nCharacter successfully created!\n")
-                        .await?;
-                }
-                Err(err) => {
-                    let err_text = format!("Character Creation Error: {}\n", err.to_string().red());
-                    writer.write_all(err_text.as_bytes()).await?;
-                    return Ok(());
-                }
-            }
+        if status == "created" {
+            writer
+                .write_all(b"\nCharacter successfully created!\n")
+                .await?;
         } else {
             let welcome = format!("\nWelcome back, {}!\n", actor.cyan().bold());
             writer.write_all(welcome.as_bytes()).await?;
@@ -133,14 +121,17 @@ impl Server {
                             if let Some(action) = CommandParser::parse(input) {
                                 if action.get("type").and_then(|t| t.as_str()) == Some("local_help") {
                                     let help_text = format!(
-                                        "\n{}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n{}\n",
+                                        "\n{}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n{}\n",
                                         "--- COMMAND HELP ---".cyan().bold(),
-                                        "look / l              - Inspect current room",
-                                        "n / s / e / w / u / d - Movement directions",
-                                        "go <exit>             - Move to custom exits (e.g. go forest)",
-                                        "get <item>            - Pick up item from floor (e.g. get hoe)",
-                                        "say <msg>             - Speak locally to everyone in room",
-                                        "quit / exit           - Safely exit the game",
+                                        "look / l                  - Inspect current location",
+                                        "n / s / e / w / u / d     - Directional movement",
+                                        "go <exit>                 - Move to custom exit (e.g. go wild)",
+                                        "c <spell> [target]        - Cast spell (e.g. c mend, c fireball orc)",
+                                        "k <target>                - Attack target (e.g. k goblin)",
+                                        "get / g <item>            - Pick up item from floor",
+                                        "equip <item> / unequip    - Equip or unequip items",
+                                        "use <item>                - Use an item (e.g. potion, bread)",
+                                        "quit / exit               - Safely exit the game",
                                         "--------------------".cyan()
                                     );
                                     sessions.send_to(&actor, &help_text).await;
@@ -165,6 +156,47 @@ impl Server {
         Ok(())
     }
 
+    pub async fn handle_events(
+        client: &EngineClient,
+        sessions: &SessionManager,
+        actor: &str,
+        events: Vec<serde_json::Value>,
+    ) {
+        for event in events {
+            if let Some(rendered) = EventFormatter::render(actor, &event) {
+                match rendered.target {
+                    Target::Actor(actor_id) => {
+                        sessions.send_to(&actor_id, &rendered.text).await;
+                    }
+                    Target::Combatants(attacker, target) => {
+                        sessions
+                            .broadcast_combat(&attacker, &target, &rendered.text)
+                            .await;
+                    }
+                    Target::Multi(targets) => {
+                        for target in targets {
+                            sessions.send_to(target.as_str(), &rendered.text).await;
+                        }
+                    }
+                    Target::Global => {
+                        sessions.broadcast(&rendered.text).await;
+                    }
+                }
+
+                if rendered.trigger_look && actor != "system" {
+                    let look_action = json!({"type": "look"});
+                    Box::pin(Self::execute_action(
+                        client,
+                        sessions.clone(),
+                        actor,
+                        look_action,
+                    ))
+                    .await;
+                }
+            }
+        }
+    }
+
     pub async fn execute_action(
         client: &EngineClient,
         sessions: SessionManager,
@@ -173,39 +205,7 @@ impl Server {
     ) {
         match client.step(actor, action).await {
             Ok(events) => {
-                for event in events {
-                    if let Some(rendered) = EventFormatter::render(actor, &event) {
-                        match rendered.target {
-                            Target::Actor(actor_id) => {
-                                sessions.send_to(&actor_id, &rendered.text).await;
-                            }
-                            Target::Combatants(attacker, target) => {
-                                sessions
-                                    .broadcast_combat(&attacker, &target, &rendered.text)
-                                    .await;
-                            }
-                            Target::Multi(targets) => {
-                                for target in targets {
-                                    sessions.send_to(&target, &rendered.text).await;
-                                }
-                            }
-                            Target::Global => {
-                                sessions.broadcast(&rendered.text).await;
-                            }
-                        }
-
-                        if rendered.trigger_look {
-                            let look_action = json!({"type": "look"});
-                            Box::pin(Self::execute_action(
-                                client,
-                                sessions.clone(),
-                                actor,
-                                look_action,
-                            ))
-                            .await;
-                        }
-                    }
-                }
+                Self::handle_events(client, &sessions, actor, events).await;
             }
             Err(err) => {
                 let err_text = format!("Engine Error: {}\n", err.to_string().red());

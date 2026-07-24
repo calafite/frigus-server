@@ -1,37 +1,21 @@
-mod character;
-mod client;
-mod command;
+mod cmd;
 mod config;
-mod format;
-mod heartbeat;
-mod server;
-mod session;
+mod engine;
+mod http;
+mod ws;
 
-use client::EngineClient;
-use config::Config;
-use heartbeat::Heartbeat;
-use server::Server;
-use session::SessionManager;
+use config::EnvLoader;
+use http::WebServer;
 use tracing::info;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), String> {
     tracing_subscriber::fmt::init();
 
-    let config = Config::from_env();
-    let client = EngineClient::new(&config.engine_url);
-    let sessions = SessionManager::new();
+    let cfg = EnvLoader::load();
 
-    info!("Starting Frigus MUD Gateway");
-    info!("Prolog Engine URL: {}", config.engine_url);
+    info!("Starting Frigus Gateway");
+    info!("Target Engine: {}", cfg.engine);
 
-    let heartbeat = Heartbeat::new(config.clone(), client.clone());
-    tokio::spawn(async move {
-        heartbeat.run().await;
-    });
-
-    let server = Server::new(config, client, sessions);
-    server.run().await?;
-
-    Ok(())
+    WebServer::start(cfg).await
 }

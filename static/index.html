@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Frigus MUD</title>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+
+        <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+        <div id="auth-overlay" class="overlay">
+            <div class="auth-card">
+                <div class="auth-tabs">
+                    <button
+                        type="button"
+                        id="tab-login"
+                        class="tab-btn active"
+                        onclick="ui.switchAuthTab('login')"
+                    >
+                        Login
+                    </button>
+                    <button
+                        type="button"
+                        id="tab-reg"
+                        class="tab-btn"
+                        onclick="ui.switchAuthTab('reg')"
+                    >
+                        Register
+                    </button>
+                </div>
+
+                <form id="login-form" onsubmit="auth.handleLogin(event)">
+                    <div class="auth-header">
+                        <h2>Welcome Back</h2>
+                        <p>Enter your credentials to continue your journey.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-name">Character Name</label>
+                        <input
+                            type="text"
+                            id="login-name"
+                            class="input-field"
+                            placeholder="e.g. Nycolas"
+                            autocomplete="off"
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label for="login-pass">Password</label>
+                        <input
+                            type="password"
+                            id="login-pass"
+                            class="input-field"
+                            placeholder="••••••••"
+                            autocomplete="off"
+                        />
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        Enter World
+                    </button>
+                    <div id="login-err" class="error-msg"></div>
+                </form>
+
+                <form
+                    id="reg-form"
+                    style="display: none"
+                    onsubmit="auth.handleRegister(event)"
+                >
+                    <div id="reg-step-1">
+                        <div class="auth-header">
+                            <h2>Forge Your Legacy</h2>
+                            <p>Step 1: Identity and Lineage</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reg-name">Character Name</label>
+                            <input
+                                type="text"
+                                id="reg-name"
+                                class="input-field"
+                                placeholder="e.g. Nycolas"
+                                autocomplete="off"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-pass">Password</label>
+                            <input
+                                type="password"
+                                id="reg-pass"
+                                class="input-field"
+                                placeholder="••••••••"
+                                autocomplete="off"
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reg-race">Lineage</label>
+                            <div class="select-wrapper">
+                                <select id="reg-race" class="input-field">
+                                    <option value="human">
+                                        Human (Balanced)
+                                    </option>
+                                    <option value="high_elf">
+                                        High Elf (Magic Focus)
+                                    </option>
+                                    <option value="wood_elf">
+                                        Wood Elf (Agile)
+                                    </option>
+                                    <option value="dark_elf">
+                                        Dark Elf (Nimble/Magic)
+                                    </option>
+                                    <option value="dwarf">
+                                        Dwarf (Hardy/CON)
+                                    </option>
+                                    <option value="orc">
+                                        Orc (Physical STR)
+                                    </option>
+                                    <option value="goblin">
+                                        Goblin (Quick/Flurry)
+                                    </option>
+                                    <option value="kobold">
+                                        Kobold (Quick/Lucky)
+                                    </option>
+                                    <option value="halfling">
+                                        Halfling (Lucky/Quick)
+                                    </option>
+                                    <option value="gnome">
+                                        Gnome (Keen Mind/INT)
+                                    </option>
+                                    <option value="giant">
+                                        Giant (Heavy CON/STR)
+                                    </option>
+                                    <option value="ogre">
+                                        Ogre (High Regen)
+                                    </option>
+                                    <option value="troll">
+                                        Troll (Troll Regen/Heavy)
+                                    </option>
+                                    <option value="wolfkin">
+                                        Wolfkin (Feral/Agile)
+                                    </option>
+                                    <option value="nymph">
+                                        Nymph (Elusive/CHA)
+                                    </option>
+                                    <option
+                                        value="angel"
+                                        class="restricted-opt"
+                                    >
+                                        Angel 🔒 (Restricted / Celestial)
+                                    </option>
+                                    <option
+                                        value="demon"
+                                        class="restricted-opt"
+                                    >
+                                        Demon 🔒 (Restricted / Celestial)
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="admin-key-box" id="admin-key-container">
+                            <div class="key-header">
+                                <label id="key-hint"
+                                    >Master Admin Key (Optional)</label
+                                >
+                                <span id="key-badge" class="badge"></span>
+                            </div>
+                            <input
+                                type="password"
+                                id="reg-key"
+                                class="input-field"
+                                placeholder="Type key to verify..."
+                                autocomplete="off"
+                            />
+                        </div>
+
+                        <button
+                            type="button"
+                            class="btn btn-primary btn-block"
+                            onclick="auth.nextRegStep()"
+                        >
+                            Next: Attributes &rarr;
+                        </button>
+                        <div id="reg-err-1" class="error-msg"></div>
+                    </div>
+
+                    <div id="reg-step-2" style="display: none">
+                        <div class="auth-header">
+                            <h2>Shape Your Power</h2>
+                            <p>Step 2: Attribute Allocation</p>
+                        </div>
+
+                        <div class="budget-panel">
+                            <span>Available Points</span>
+                            <span id="pts-rem" class="budget-value">15</span>
+                        </div>
+
+                        <div
+                            id="stat-alloc-container"
+                            class="stat-alloc-grid"
+                        ></div>
+
+                        <div class="step-actions">
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                onclick="auth.prevRegStep()"
+                            >
+                                &larr; Back
+                            </button>
+                            <button
+                                type="submit"
+                                class="btn btn-primary"
+                                style="flex: 2"
+                            >
+                                Awaken
+                            </button>
+                        </div>
+                        <div id="reg-err-2" class="error-msg"></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div
+            id="death-overlay"
+            class="overlay"
+            style="
+                display: none;
+                background-color: rgba(50, 0, 0, 0.95);
+                z-index: 2000;
+                flex-direction: column;
+            "
+        >
+            <h1
+                style="
+                    color: #ef4444;
+                    font-size: 4.5rem;
+                    text-shadow: 0 0 30px #000;
+                    font-weight: 800;
+                    letter-spacing: 5px;
+                    margin-bottom: 20px;
+                "
+            >
+                YOU DIED
+            </h1>
+            <p style="color: #a1a1aa; font-size: 1.2rem; font-style: italic">
+                The light fades as your soul returns to the sanctuary...
+            </p>
+        </div>
+
+        <div id="game-container">
+            <header class="top-bar">
+                <div class="logo">FRIGUS <span>MUD</span></div>
+                <div class="player-identity" id="header-identity">
+                    Not Connected
+                </div>
+            </header>
+
+            <aside class="side-panel left-panel">
+                <section class="panel-section">
+                    <h3 class="section-title">Vitals</h3>
+                    <div class="vitals-container">
+                        <div class="bar-group">
+                            <div class="bar-label">
+                                <span>HP</span><span id="val-hp">0/0</span>
+                            </div>
+                            <div class="progress-track">
+                                <div
+                                    id="bar-hp"
+                                    class="progress-fill fill-hp"
+                                    style="width: 0%"
+                                ></div>
+                            </div>
+                        </div>
+                        <div class="bar-group">
+                            <div class="bar-label">
+                                <span>MP</span><span id="val-mp">0/0</span>
+                            </div>
+                            <div class="progress-track">
+                                <div
+                                    id="bar-mp"
+                                    class="progress-fill fill-mp"
+                                    style="width: 0%"
+                                ></div>
+                            </div>
+                        </div>
+                        <div class="bar-group">
+                            <div class="bar-label">
+                                <span>XP</span><span id="val-xp">0/0</span>
+                            </div>
+                            <div class="progress-track">
+                                <div
+                                    id="bar-xp"
+                                    class="progress-fill fill-xp"
+                                    style="width: 0%"
+                                ></div>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Afflictions Container -->
+                        <div id="self-affs" class="aff-container"></div>
+                    </div>
+                </section>
+
+                <section class="panel-section">
+                    <div class="section-header">
+                        <h3 class="section-title">Attributes</h3>
+                        <span
+                            id="val-bounty"
+                            class="bounty-tag"
+                            style="display: none"
+                            >0g Bounty</span
+                        >
+                    </div>
+                    <div class="stats-grid" id="stats-panel"></div>
+                </section>
+
+                <section class="panel-section flex-fill">
+                    <h3 class="section-title">Equipment & Inventory</h3>
+                    <div id="inv-panel" class="inventory-list"></div>
+                </section>
+            </aside>
+
+            <main class="center-panel">
+                <div id="log-container" class="log-viewport">
+                    <div class="log-entry sys-msg">
+                        Welcome to Frigus MUD. Awaiting connection...
+                    </div>
+                </div>
+                <div class="command-bar">
+                    <form id="cmd-form" onsubmit="game.sendCommand(event)">
+                        <span class="cmd-prompt">&gt;</span>
+                        <input
+                            type="text"
+                            id="cmd-input"
+                            class="cmd-input"
+                            placeholder="What will you do? (Type 'help' for commands)"
+                            autocomplete="off"
+                            disabled
+                        />
+                    </form>
+                </div>
+            </main>
+
+            <aside class="side-panel right-panel">
+                <section class="panel-section">
+                    <h3 class="section-title">Current Location</h3>
+                    <div class="location-card">
+                        <h4 id="room-name" class="room-title">The Void</h4>
+                        <p id="room-desc" class="room-desc">
+                            You are floating in emptiness.
+                        </p>
+                        <div class="exits-container">
+                            <span class="exits-label">Exits:</span>
+                            <div id="room-exits" class="exits-list"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel-section flex-fill">
+                    <h3 class="section-title">Entities</h3>
+                    <div id="entities-panel" class="entity-list"></div>
+                </section>
+
+                <section class="panel-section flex-fill">
+                    <h3 class="section-title">Items</h3>
+                    <div id="items-panel" class="item-list"></div>
+                </section>
+            </aside>
+        </div>
+
+        <script src="/app.js"></script>
+    </body>
+</html>
