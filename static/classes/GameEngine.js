@@ -272,10 +272,17 @@ export class GameEngine {
         );
         break;
       case "aff_applied":
-        window.ui.log(
-          `❇️ <strong>${Utils.formatName(args[1])}</strong> afflicted <strong>${Utils.escapeHtml(args[0])}</strong>!`,
-          "msg-system",
-        );
+        if (args[1] === "asleep") {
+          window.ui.log(
+            `💤 <strong>${Utils.escapeHtml(args[0])}</strong> falls fast asleep.`,
+            "msg-system",
+          );
+        } else {
+          window.ui.log(
+            `❇️ <strong>${Utils.formatName(args[1])}</strong> afflicted <strong>${Utils.escapeHtml(args[0])}</strong>!`,
+            "msg-system",
+          );
+        }
         this.send({ type: "cmd", text: "look" });
         break;
       case "aff_tick":
@@ -285,10 +292,17 @@ export class GameEngine {
         );
         break;
       case "aff_faded":
-        window.ui.log(
-          `💨 <strong>${Utils.formatName(args[1])}</strong> faded from <strong>${Utils.escapeHtml(args[0])}</strong>.`,
-          "msg-system",
-        );
+        if (args[1] === "asleep") {
+          window.ui.log(
+            `☀️ <strong>${Utils.escapeHtml(args[0])}</strong> wakes up!`,
+            "msg-system",
+          );
+        } else {
+          window.ui.log(
+            `💨 <strong>${Utils.formatName(args[1])}</strong> faded from <strong>${Utils.escapeHtml(args[0])}</strong>.`,
+            "msg-system",
+          );
+        }
         this.send({ type: "cmd", text: "look" });
         break;
       case "say":
@@ -446,6 +460,13 @@ export class GameEngine {
       case "env_msg":
         window.ui.log(`🌍 ${Utils.escapeHtml(args[0])}`, "msg-env");
         this.send({ type: "cmd", text: "look" });
+        break;
+      case "ambient_msg":
+        // Ambient messages just slip into the log gracefully, highly stylized.
+        window.ui.log(
+          `🍃 <span style="color: #94a3b8; font-style: italic;">${Utils.escapeHtml(args[0])}</span>`,
+          "",
+        );
         break;
       case "time_report":
         window.ui.log(`🕒 ${Utils.escapeHtml(args[1])}`, "msg-env");

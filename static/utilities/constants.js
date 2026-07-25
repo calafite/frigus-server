@@ -7,7 +7,7 @@ export const BUFFS = [
 ];
 
 export const CCS = [
-  "frozen", "paralysed", "stunned", "silenced", "rooted", "panicked",
+  "frozen", "paralysed", "stunned", "silenced", "rooted", "panicked", "asleep"
 ];
 
 export const DEBUFFS = [
