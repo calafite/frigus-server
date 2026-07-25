@@ -26,7 +26,13 @@ impl WebServer {
             .route("/styles.css", get(Self::get_css))
             .route("/app.js", get(Self::get_js))
             .route("/classes/AuthManager.js", get(Self::get_js_auth_manager))
+            .route(
+                "/classes/EventDispatcher.js",
+                get(Self::get_js_event_dispatcher),
+            )
+            .route("/classes/ErrorHandler.js", get(Self::get_js_error_handler))
             .route("/classes/GameEngine.js", get(Self::get_js_game_engine))
+            .route("/classes/TimeManager.js", get(Self::get_js_time_manager))
             .route("/classes/UIManager.js", get(Self::get_js_ui_manager))
             .route("/utilities/constants.js", get(Self::get_js_constants))
             .route("/utilities/utils.js", get(Self::get_js_utils))
@@ -73,10 +79,43 @@ impl WebServer {
         )
     }
 
+    async fn get_js_event_dispatcher() -> impl IntoResponse {
+        let js_str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/static/classes/EventDispatcher.js"
+        ));
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+            js_str,
+        )
+    }
+
+    async fn get_js_error_handler() -> impl IntoResponse {
+        let js_str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/static/classes/ErrorHandler.js"
+        ));
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+            js_str,
+        )
+    }
+
     async fn get_js_game_engine() -> impl IntoResponse {
         let js_str = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/static/classes/GameEngine.js"
+        ));
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+            js_str,
+        )
+    }
+
+    async fn get_js_time_manager() -> impl IntoResponse {
+        let js_str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/static/classes/TimeManager.js"
         ));
         (
             [(axum::http::header::CONTENT_TYPE, "application/javascript")],
