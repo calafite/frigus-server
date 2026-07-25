@@ -168,14 +168,30 @@
                             <label for="reg-class">Class Path</label>
                             <div class="select-wrapper">
                                 <select id="reg-class" class="input-field">
-                                    <option value="fighter">Fighter (Martial)</option>
-                                    <option value="mage">Mage (Arcane Elements)</option>
-                                    <option value="cleric">Cleric (Holy/Support)</option>
-                                    <option value="paladin">Paladin (Holy/Martial)</option>
-                                    <option value="ranger">Ranger (Nature/Martial)</option>
-                                    <option value="druid">Druid (Nature/Summons)</option>
-                                    <option value="warlock">Warlock (Demonic Arts)</option>
-                                    <option value="necromancer">Necromancer (Death Arts)</option>
+                                    <option value="fighter">
+                                        Fighter (Martial)
+                                    </option>
+                                    <option value="mage">
+                                        Mage (Arcane Elements)
+                                    </option>
+                                    <option value="cleric">
+                                        Cleric (Holy/Support)
+                                    </option>
+                                    <option value="paladin">
+                                        Paladin (Holy/Martial)
+                                    </option>
+                                    <option value="ranger">
+                                        Ranger (Nature/Martial)
+                                    </option>
+                                    <option value="druid">
+                                        Druid (Nature/Summons)
+                                    </option>
+                                    <option value="warlock">
+                                        Warlock (Demonic Arts)
+                                    </option>
+                                    <option value="necromancer">
+                                        Necromancer (Death Arts)
+                                    </option>
                                 </select>
                             </div>
                         </div>
@@ -274,7 +290,9 @@
         <div id="game-container">
             <header class="top-bar">
                 <div class="logo">FRIGUS <span>MUD</span></div>
-                <div id="header-clock" class="header-clock">🕒 08:00 (Spring)</div>
+                <div id="header-clock" class="header-clock">
+                    🕒 08:00 (Spring)
+                </div>
                 <div class="player-identity" id="header-identity">
                     Not Connected
                 </div>
@@ -372,13 +390,29 @@
                     <div class="location-card">
                         <div class="location-header">
                             <h4 id="room-name" class="room-title">The Void</h4>
-                            <span id="room-safe-badge" class="safe-badge" style="display: none;">🛡️ Safe Zone</span>
+                            <div style="display: flex; gap: 6px">
+                                <span
+                                    id="room-quest-badge"
+                                    class="quest-badge"
+                                    style="display: none"
+                                    >📜 Quest Board</span
+                                >
+                                <span
+                                    id="room-safe-badge"
+                                    class="safe-badge"
+                                    style="display: none"
+                                    >🛡️ Safe Zone</span
+                                >
+                            </div>
                         </div>
                         <p id="room-desc" class="room-desc">
                             You are floating in emptiness.
                         </p>
 
-                        <div id="room-env-tags" class="env-tags-container"></div>
+                        <div
+                            id="room-env-tags"
+                            class="env-tags-container"
+                        ></div>
 
                         <div class="exits-container">
                             <span class="exits-label">Exits:</span>

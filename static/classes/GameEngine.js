@@ -134,6 +134,13 @@ export class GameEngine {
       case "inventory_info":
         window.ui.updateInventory(args[1], args[2]);
         break;
+
+      // ---- QUEST SYSTEM EVENT ----
+      case "quest_report":
+        window.ui.log(args[1], "msg-system");
+        break;
+      // ----------------------------
+
       case "browse_report": {
         const npcName = args[1];
         const items = args[2];
@@ -510,8 +517,35 @@ export class GameEngine {
       case "error":
         const errObj = args[0];
 
+        if (errObj && errObj.type === "no_quest_board") {
+          window.ui.log(`❌ There is no quest board here.`, "msg-error");
+        } else if (errObj && errObj.type === "quest_not_found") {
+          window.ui.log(`❌ Could not find a quest with that ID.`, "msg-error");
+        } else if (errObj && errObj.type === "quest_already_accepted") {
+          window.ui.log(
+            `❌ You have already accepted that quest.`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "quest_already_completed") {
+          window.ui.log(
+            `❌ You have already completed that quest.`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "quest_not_accepted") {
+          window.ui.log(`❌ You haven't accepted that quest yet.`, "msg-error");
+        } else if (errObj && errObj.type === "quest_objectives_incomplete") {
+          window.ui.log(
+            `❌ You haven't completed all objectives for this quest.`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "invalid_quest_command") {
+          window.ui.log(
+            `❌ Invalid quest command. Use: list, read <id>, accept <id>, finish <id>, progress [id]`,
+            "msg-error",
+          );
+        }
         // --- NEW PARTY ERRORS ---
-        if (errObj && errObj.type === "already_in_party") {
+        else if (errObj && errObj.type === "already_in_party") {
           window.ui.log(`❌ You are already in a party!`, "msg-error");
         } else if (errObj && errObj.type === "party_name_required") {
           window.ui.log(

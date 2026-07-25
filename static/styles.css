@@ -574,6 +574,9 @@ body {
 .mob-neutral {
     border-left-color: var(--gold);
 }
+.mob-friendly {
+    border-left-color: var(--success);
+}
 .player-entity {
     border-left-color: var(--accent);
 }
@@ -608,6 +611,20 @@ body {
     align-items: center;
     gap: 4px;
     box-shadow: 0 0 8px rgba(34, 197, 94, 0.2);
+    white-space: nowrap;
+}
+.quest-badge {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: var(--gold);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
     white-space: nowrap;
 }
 .room-desc {

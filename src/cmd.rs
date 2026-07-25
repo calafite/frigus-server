@@ -69,6 +69,11 @@ impl CmdParser {
                     .trim();
                 Some(json!({ "type": "party", "action": sub, "target": target }))
             }
+            "quest" | "q" | "quests" => {
+                let action = if arg1.is_empty() { "list" } else { arg1 };
+                let target = if arg2 == "none" { "" } else { arg2 };
+                Some(json!({ "type": "quest", "action": action, "target": target }))
+            }
             _ => Self::json(text),
         }
     }
