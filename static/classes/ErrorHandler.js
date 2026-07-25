@@ -137,7 +137,9 @@ const ERROR_REGISTRY = {
     ui.switchAuthTab("reg");
   },
   account_already_exists: (args, ui) => {
-    alert(`Character name "${args[0]}" is already taken! Please choose another name.`);
+    alert(
+      `Character name "${args[0]}" is already taken! Please choose another name.`,
+    );
     ui.showOverlay();
     ui.switchAuthTab("reg");
   },
@@ -187,7 +189,10 @@ export class ErrorHandler {
       }
     } else {
       // Fallback for unhandled/unknown errors
-      ui.log(`[ERROR] ${Utils.escapeHtml(JSON.stringify(rawArgs))}`, "msg-error");
+      ui.log(
+        `[ERROR] ${Utils.escapeHtml(JSON.stringify(rawArgs))}`,
+        "msg-error",
+      );
     }
   }
 }

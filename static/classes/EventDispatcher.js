@@ -293,7 +293,10 @@ export class EventDispatcher {
           `☠️ <strong>${deadName} HAS BEEN SLAIN!</strong>`,
           "msg-crime",
         );
-        if (args[0] === this.engine.currentActor || args[1] === this.engine.currentActor) {
+        if (
+          args[0] === this.engine.currentActor ||
+          args[1] === this.engine.currentActor
+        ) {
           const overlay = document.getElementById("death-overlay");
           if (overlay) overlay.style.display = "flex";
 
