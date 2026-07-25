@@ -1,4 +1,4 @@
-import { onDOMReady, Utils } from "../utilities/utils.js";
+import { onDOMReady, Utils } from '../utilities/utils.js';
 
 export class UIManager {
   constructor() {
@@ -13,12 +13,8 @@ export class UIManager {
 
   switchAuthTab(mode) {
     const isLogin = mode === "login";
-    document.getElementById("login-form").style.display = isLogin
-      ? "block"
-      : "none";
-    document.getElementById("reg-form").style.display = isLogin
-      ? "none"
-      : "block";
+    document.getElementById("login-form").style.display = isLogin ? "block" : "none";
+    document.getElementById("reg-form").style.display = isLogin ? "none" : "block";
     document.getElementById("tab-login").classList.toggle("active", isLogin);
     document.getElementById("tab-reg").classList.toggle("active", !isLogin);
 
@@ -52,12 +48,9 @@ export class UIManager {
   }
 
   updateVitals(hp, maxHp, mp, maxMp, xp = 0, reqXp = 100, affs = {}) {
-    const hpPercent =
-      maxHp > 0 ? Math.min(100, Math.max(0, (hp / maxHp) * 100)) : 0;
-    const mpPercent =
-      maxMp > 0 ? Math.min(100, Math.max(0, (mp / maxMp) * 100)) : 0;
-    const xpPercent =
-      reqXp > 0 ? Math.min(100, Math.max(0, (xp / reqXp) * 100)) : 0;
+    const hpPercent = maxHp > 0 ? Math.min(100, Math.max(0, (hp / maxHp) * 100)) : 0;
+    const mpPercent = maxMp > 0 ? Math.min(100, Math.max(0, (mp / maxMp) * 100)) : 0;
+    const xpPercent = reqXp > 0 ? Math.min(100, Math.max(0, (xp / reqXp) * 100)) : 0;
 
     document.getElementById("bar-hp").style.width = `${hpPercent}%`;
     document.getElementById("val-hp").innerText = `${hp} / ${maxHp}`;
@@ -108,8 +101,7 @@ export class UIManager {
         html += `<div class="list-item ${tagClass}"><div class="list-item-header"><span class="item-name">${Utils.formatName(item.tag)}</span><span class="item-meta">x${item.qty}</span></div></div>`;
       });
     }
-    if (!html)
-      html = `<div style="color:var(--text-muted); font-style:italic;">Inventory is empty.</div>`;
+    if (!html) html = `<div style="color:var(--text-muted); font-style:italic;">Inventory is empty.</div>`;
     panel.innerHTML = html;
   }
 
@@ -130,9 +122,7 @@ export class UIManager {
     if (envTagsContainer && envDesc) {
       const parts = envDesc.split(" | ");
       envTagsContainer.innerHTML = parts
-        .map(
-          (part) => `<span class="env-chip">${Utils.escapeHtml(part)}</span>`,
-        )
+        .map((part) => `<span class="env-chip">${Utils.escapeHtml(part)}</span>`)
         .join("");
 
       const timeMatch = envDesc.match(/(\d{2}:\d{2})/);
@@ -174,40 +164,32 @@ export class UIManager {
     let html = "";
     if (players && players.length > 0) {
       players.forEach((p) => {
-        const bty =
-          p.bounty > 0
-            ? ` <span style="color:var(--danger); font-weight:bold;">[💀 ${p.bounty}g]</span>`
-            : "";
+        const bty = p.bounty > 0 ? ` <span style="color:var(--danger); font-weight:bold;">[💀 ${p.bounty}g]</span>` : "";
         const affsHtml = Utils.renderAffs(p.affs);
         html += `<div class="list-item player-entity"><div class="list-item-header"><span class="item-name">${Utils.escapeHtml(p.id)}${bty}</span><span class="item-meta">${p.hp}/${p.max_hp} HP</span></div><div class="entity-affs">${affsHtml}</div></div>`;
       });
     }
     if (mobs && mobs.length > 0) {
-      const nonHostileTags = [
-        "guard",
-        "peasant",
-        "merchant",
-        "priest",
-        "miner",
-        "citizen",
-      ];
+      const nonHostileTags = ["guard", "peasant", "merchant", "priest", "miner", "citizen"];
       mobs.forEach((m) => {
-        let mobClass = "mob-neutral";
-        if (m.friendly) {
-          mobClass = "mob-friendly";
-        } else if (
-          m.hostile !== undefined
-            ? m.hostile
-            : !nonHostileTags.includes((m.tag || "").toLowerCase())
-        ) {
-          mobClass = "mob-hostile";
+        const isHostile = m.hostile !== undefined
+          ? m.hostile
+          : !nonHostileTags.includes((m.tag || "").toLowerCase());
+
+        let mobClass = isHostile ? "mob-hostile" : "mob-neutral";
+
+        // Render owned/friendly summons with the player-entity class (blue)
+        if (m.owner !== "none" && m.owner !== undefined) {
+            if (!isHostile) {
+                mobClass = "player-entity";
+            }
         }
+
         const affsHtml = Utils.renderAffs(m.affs);
         html += `<div class="list-item ${mobClass}"><div class="list-item-header"><span class="item-name">${Utils.formatName(m.name || m.tag)}</span><span class="item-meta">${m.hp}/${m.max_hp} HP</span></div><div class="entity-affs">${affsHtml}</div></div>`;
       });
     }
-    if (!html)
-      html = `<div style="color:var(--text-muted); font-style:italic;">No other beings present.</div>`;
+    if (!html) html = `<div style="color:var(--text-muted); font-style:italic;">No other beings present.</div>`;
     panel.innerHTML = html;
   }
 
