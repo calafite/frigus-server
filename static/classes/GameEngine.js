@@ -1,4 +1,93 @@
-processEvent(ev) {
+import { Utils } from "../utilities/utils.js";
+
+export class GameEngine {
+  constructor() {
+    this.ws = null;
+    this.currentActor = "";
+    this.authPayload = null;
+    this.respawnTimer = null;
+    this.currentMinutes = 480;
+    this.currentSeason = "Spring";
+    this.clockInterval = null;
+    this.startClockTimer();
+  }
+
+  startClockTimer() {
+    if (this.clockInterval) clearInterval(this.clockInterval);
+    this.clockInterval = setInterval(() => {
+      this.currentMinutes = (this.currentMinutes + 1) % 1440;
+      window.ui.updateClockFromMinutes(this.currentMinutes, this.currentSeason);
+    }, 1000);
+  }
+
+  syncClock(timeStr, seasonStr) {
+    if (timeStr) {
+      const parts = timeStr.split(":");
+      if (parts.length === 2) {
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (!isNaN(h) && !isNaN(m)) {
+          this.currentMinutes = h * 60 + m;
+        }
+      }
+    }
+    if (seasonStr) this.currentSeason = seasonStr;
+    window.ui.updateClockFromMinutes(this.currentMinutes, this.currentSeason);
+  }
+
+  connect() {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    this.ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+    this.ws.onopen = () => {
+      window.ui.log("Connected to Frigus Realm.", "msg-system");
+      if (this.authPayload) {
+        this.send(this.authPayload);
+      }
+    };
+    this.ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.events) data.events.forEach((ev) => this.processEvent(ev));
+        else if (data.status === "error" || data.status === "exception")
+          window.ui.log(`[SYSTEM EXCEPTION] ${data.error}`, "msg-error");
+      } catch (err) {
+        console.error("Parse Error:", err, e.data);
+      }
+    };
+    this.ws.onclose = () => {
+      window.ui.log("Connection lost. Refresh to reconnect.", "msg-error");
+      window.ui.showOverlay();
+    };
+  }
+
+  send(payload) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN)
+      this.ws.send(JSON.stringify(payload));
+  }
+
+  sendCommand(e) {
+    e.preventDefault();
+    const input = document.getElementById("cmd-input");
+    const txt = input.value.trim();
+    if (!txt) return;
+    window.ui.log(`&gt; ${Utils.escapeHtml(txt)}`, "msg-echo");
+    this.send({ type: "cmd", text: txt });
+    input.value = "";
+  }
+
+  authenticate(payload) {
+    this.currentActor = payload.actor;
+    this.authPayload = payload;
+    const identElem = document.getElementById("header-identity");
+    if (identElem)
+      identElem.innerText = `${payload.actor} (${Utils.formatName(payload.race || "human")})`;
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) this.send(payload);
+    else this.connect();
+    window.ui.hideOverlay();
+  }
+
+  processEvent(ev) {
     const type = ev.type || (typeof ev === "string" ? ev : Object.keys(ev)[0]);
     const args = ev.args || ev[type] || [];
 
@@ -49,118 +138,199 @@ processEvent(ev) {
         const npcName = args[1];
         const items = args[2];
         let browseHtml = `<div style="border: 1px solid var(--magic); padding: 12px; border-radius: 6px; background: var(--bg-surface); margin: 6px 0;">
-            <strong style="color: var(--magic);">--- ${Utils.escapeHtml(npcName)}'s Wares ---</strong><br>
-            <div style="margin-top: 8px; line-height: 1.6;">`;
+              <strong style="color: var(--magic);">--- ${Utils.escapeHtml(npcName)}'s Wares ---</strong><br>
+              <div style="margin-top: 8px; line-height: 1.6;">`;
         if (items && items.length > 0) {
-            items.forEach(item => {
-                browseHtml += `&bull; <strong>${Utils.formatName(item.tag)}</strong> - <span style="color: var(--gold);">${item.price}g</span> <i>(Stock: ${item.qty})</i><br>`;
-            });
+          items.forEach((item) => {
+            browseHtml += `&bull; <strong>${Utils.formatName(item.tag)}</strong> - <span style="color: var(--gold);">${item.price}g</span> <i>(Stock: ${item.qty})</i><br>`;
+          });
         } else {
-            browseHtml += `<span style="color: var(--text-muted); font-style: italic;">Sold out.</span>`;
+          browseHtml += `<span style="color: var(--text-muted); font-style: italic;">Sold out.</span>`;
         }
         browseHtml += `</div></div>`;
         window.ui.log(browseHtml, "msg-system");
         break;
       }
       case "bought":
-        window.ui.log(`🛒 You bought <strong>${Utils.formatName(args[2])}</strong> from <strong>${Utils.escapeHtml(args[1])}</strong> for <strong style="color: var(--gold);">${args[3]}g</strong>.`, "msg-system");
+        window.ui.log(
+          `🛒 You bought <strong>${Utils.formatName(args[2])}</strong> from <strong>${Utils.escapeHtml(args[1])}</strong> for <strong style="color: var(--gold);">${args[3]}g</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "inventory" });
         break;
       case "sold":
-        window.ui.log(`🪙 You sold <strong>${Utils.formatName(args[2])}</strong> to <strong>${Utils.escapeHtml(args[1])}</strong> for <strong style="color: var(--gold);">${args[3]}g</strong>.`, "msg-system");
+        window.ui.log(
+          `🪙 You sold <strong>${Utils.formatName(args[2])}</strong> to <strong>${Utils.escapeHtml(args[1])}</strong> for <strong style="color: var(--gold);">${args[3]}g</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "inventory" });
         break;
       case "walk_started":
-        window.ui.log(`🚶 Auto-walk started towards <strong>${Utils.formatId(args[1])}</strong>.`, "msg-system");
+        window.ui.log(
+          `🚶 Auto-walk started towards <strong>${Utils.formatId(args[1])}</strong>.`,
+          "msg-system",
+        );
         break;
       case "walk_cancelled":
         window.ui.log(`🛑 Auto-walk cancelled.`, "msg-system");
         break;
       case "walk_completed":
-        window.ui.log(`✅ Arrived at destination: <strong>${Utils.formatId(args[1])}</strong>.`, "msg-system");
+        window.ui.log(
+          `✅ Arrived at destination: <strong>${Utils.formatId(args[1])}</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "look" });
         break;
       case "hit":
-        window.ui.log(`<strong>${Utils.escapeHtml(args[0])}</strong> struck <strong>${Utils.escapeHtml(args[1])}</strong> for <strong>${args[2]}</strong> damage! (${args[3]}/${args[4]} HP)`, "msg-combat");
+        window.ui.log(
+          `<strong>${Utils.escapeHtml(args[0])}</strong> struck <strong>${Utils.escapeHtml(args[1])}</strong> for <strong>${args[2]}</strong> damage! (${args[3]}/${args[4]} HP)`,
+          "msg-combat",
+        );
         break;
       case "crit":
-        window.ui.log(`💥 <strong>CRITICAL STRIKE!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> devastated <strong>${Utils.escapeHtml(args[1])}</strong> for <strong>${args[2]}</strong> damage! (${args[3]}/${args[4]} HP)`, "msg-combat-crit");
+        window.ui.log(
+          `💥 <strong>CRITICAL STRIKE!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> devastated <strong>${Utils.escapeHtml(args[1])}</strong> for <strong>${args[2]}</strong> damage! (${args[3]}/${args[4]} HP)`,
+          "msg-combat-crit",
+        );
         break;
       case "spell_crit":
-        window.ui.log(`🌟 <strong>SPELL CRITICAL!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> blasted <strong>${Utils.escapeHtml(args[2])}</strong> with <strong>${Utils.formatName(args[1])}</strong> for <strong>${args[3]}</strong> damage! (${args[4]}/${args[5]} HP)`, "msg-combat-crit");
+        window.ui.log(
+          `🌟 <strong>SPELL CRITICAL!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> blasted <strong>${Utils.escapeHtml(args[2])}</strong> with <strong>${Utils.formatName(args[1])}</strong> for <strong>${args[3]}</strong> damage! (${args[4]}/${args[5]} HP)`,
+          "msg-combat-crit",
+        );
         break;
       case "spell_missed":
-        window.ui.log(`🌫️ The dense mist causes <strong>${Utils.escapeHtml(args[0])}</strong>'s <strong>${Utils.formatName(args[1])}</strong> to fizzle and miss!`, "msg-dodge");
+        window.ui.log(
+          `🌫️ The dense mist causes <strong>${Utils.escapeHtml(args[0])}</strong>'s <strong>${Utils.formatName(args[1])}</strong> to fizzle and miss!`,
+          "msg-dodge",
+        );
         break;
       case "dodged":
-        window.ui.log(`⚡ <strong>${Utils.escapeHtml(args[0])}</strong> nimbly DODGED <strong>${Utils.escapeHtml(args[1])}</strong>'s attack!`, "msg-dodge");
+        window.ui.log(
+          `⚡ <strong>${Utils.escapeHtml(args[0])}</strong> nimbly DODGED <strong>${Utils.escapeHtml(args[1])}</strong>'s attack!`,
+          "msg-dodge",
+        );
         break;
       case "cast":
-        window.ui.log(`✨ <strong>${Utils.escapeHtml(args[0])}</strong> cast <strong>${Utils.formatName(args[1])}</strong> at <strong>${Utils.escapeHtml(args[2])}</strong>!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[3])}</span>`, "msg-magic");
+        window.ui.log(
+          `✨ <strong>${Utils.escapeHtml(args[0])}</strong> cast <strong>${Utils.formatName(args[1])}</strong> at <strong>${Utils.escapeHtml(args[2])}</strong>!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[3])}</span>`,
+          "msg-magic",
+        );
         break;
       case "cast_area":
-        window.ui.log(`🌩️ <strong>${Utils.escapeHtml(args[0])}</strong> conjured <strong>${Utils.formatName(args[1])}</strong>, engulfing the entire area!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[2])}</span>`, "msg-magic");
+        window.ui.log(
+          `🌩️ <strong>${Utils.escapeHtml(args[0])}</strong> conjured <strong>${Utils.formatName(args[1])}</strong>, engulfing the entire area!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[2])}</span>`,
+          "msg-magic",
+        );
         break;
       case "cast_group":
-        window.ui.log(`✨ <strong>${Utils.escapeHtml(args[0])}</strong> unleashed <strong>${Utils.formatName(args[1])}</strong> across the group!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[2])}</span>`, "msg-magic");
+        window.ui.log(
+          `✨ <strong>${Utils.escapeHtml(args[0])}</strong> unleashed <strong>${Utils.formatName(args[1])}</strong> across the group!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[2])}</span>`,
+          "msg-magic",
+        );
         break;
       case "summoned":
-        window.ui.log(`🌀 <strong>${Utils.escapeHtml(args[0])}</strong> cast <strong>${Utils.formatName(args[1])}</strong> and summoned a <strong>${Utils.formatName(args[2])}</strong>!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[3])}</span>`, "msg-magic");
+        window.ui.log(
+          `🌀 <strong>${Utils.escapeHtml(args[0])}</strong> cast <strong>${Utils.formatName(args[1])}</strong> and summoned a <strong>${Utils.formatName(args[2])}</strong>!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[3])}</span>`,
+          "msg-magic",
+        );
         this.send({ type: "cmd", text: "look" });
         break;
       case "summon_failed":
-        window.ui.log(`❌ <strong>${Utils.escapeHtml(args[0])}</strong> attempted to cast <strong>${Utils.formatName(args[1])}</strong>, but lacked the magical proficiency to manifest it!`, "msg-error");
+        window.ui.log(
+          `❌ <strong>${Utils.escapeHtml(args[0])}</strong> attempted to cast <strong>${Utils.formatName(args[1])}</strong>, but lacked the magical proficiency to manifest it!`,
+          "msg-error",
+        );
         break;
       case "summon_expired":
-        window.ui.log(`💨 The summoned <strong>${Utils.formatName(args[0])}</strong> dissipates into mist.`, "msg-system");
+        window.ui.log(
+          `💨 The summoned <strong>${Utils.formatName(args[0])}</strong> dissipates into mist.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "look" });
         break;
       case "cast_crit":
-        window.ui.log(`🌟 <strong>SPELL CRITICAL!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> empowered <strong>${Utils.formatName(args[1])}</strong>!`, "msg-magic");
+        window.ui.log(
+          `🌟 <strong>SPELL CRITICAL!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> empowered <strong>${Utils.formatName(args[1])}</strong>!`,
+          "msg-magic",
+        );
         break;
       case "healed":
-        window.ui.log(`💚 <strong>${Utils.escapeHtml(args[0])}</strong> restored <strong>${args[1]}</strong> HP! (${args[2]}/${args[3]})`, "msg-heal");
+        window.ui.log(
+          `💚 <strong>${Utils.escapeHtml(args[0])}</strong> restored <strong>${args[1]}</strong> HP! (${args[2]}/${args[3]})`,
+          "msg-heal",
+        );
         break;
       case "aff_applied":
-        window.ui.log(`❇️ <strong>${Utils.formatName(args[1])}</strong> afflicted <strong>${Utils.escapeHtml(args[0])}</strong>!`, "msg-system");
+        window.ui.log(
+          `❇️ <strong>${Utils.formatName(args[1])}</strong> afflicted <strong>${Utils.escapeHtml(args[0])}</strong>!`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "look" });
         break;
       case "aff_tick":
-        window.ui.log(`🔥 <strong>${Utils.escapeHtml(args[0])}</strong> suffers <strong>${args[2]}</strong> damage from <strong>${Utils.formatName(args[1])}</strong>!`, "msg-dot");
+        window.ui.log(
+          `🔥 <strong>${Utils.escapeHtml(args[0])}</strong> suffers <strong>${args[2]}</strong> damage from <strong>${Utils.formatName(args[1])}</strong>!`,
+          "msg-dot",
+        );
         break;
       case "aff_faded":
-        window.ui.log(`💨 <strong>${Utils.formatName(args[1])}</strong> faded from <strong>${Utils.escapeHtml(args[0])}</strong>.`, "msg-system");
+        window.ui.log(
+          `💨 <strong>${Utils.formatName(args[1])}</strong> faded from <strong>${Utils.escapeHtml(args[0])}</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "look" });
         break;
       case "say":
-        window.ui.log(`💬 <strong>${Utils.escapeHtml(args[0])}</strong> says: "${Utils.escapeHtml(args[1])}"`, "msg-chat");
+        window.ui.log(
+          `💬 <strong>${Utils.escapeHtml(args[0])}</strong> says: "${Utils.escapeHtml(args[1])}"`,
+          "msg-chat",
+        );
         break;
 
       // ---- NEW PARTY EVENTS ----
       case "party_created":
-        window.ui.log(`🎉 <strong>${Utils.escapeHtml(args[0])}</strong> formed the party <strong>${Utils.escapeHtml(args[1])}</strong>!`, "msg-system");
+        window.ui.log(
+          `🎉 <strong>${Utils.escapeHtml(args[0])}</strong> formed the party <strong>${Utils.escapeHtml(args[1])}</strong>!`,
+          "msg-system",
+        );
         break;
       case "party_info":
         let pInfo = `<div style="border:1px solid var(--accent); padding:12px; margin:8px 0; background:var(--bg-surface); border-radius:6px;">
-            <strong style="color:var(--accent);">--- PARTY: ${Utils.escapeHtml(args[0])} ---</strong><br>`;
+              <strong style="color:var(--accent);">--- PARTY: ${Utils.escapeHtml(args[0])} ---</strong><br>`;
         pInfo += `<div style="margin-top:6px;"><strong>Leader:</strong> ${Utils.escapeHtml(args[1])}</div>`;
-        pInfo += `<div style="margin-top:6px;"><strong>Members:</strong> ${args[2].map(m => Utils.escapeHtml(m)).join(", ")}</div></div>`;
+        pInfo += `<div style="margin-top:6px;"><strong>Members:</strong> ${args[2].map((m) => Utils.escapeHtml(m)).join(", ")}</div></div>`;
         window.ui.log(pInfo, "msg-system");
         break;
       case "party_invite_sent":
-        window.ui.log(`✉️ <strong>${Utils.escapeHtml(args[0])}</strong> invited <strong>${Utils.escapeHtml(args[1])}</strong> to join <strong>${Utils.escapeHtml(args[2])}</strong>. Type <i>party accept</i> to join!`, "msg-system");
+        window.ui.log(
+          `✉️ <strong>${Utils.escapeHtml(args[0])}</strong> invited <strong>${Utils.escapeHtml(args[1])}</strong> to join <strong>${Utils.escapeHtml(args[2])}</strong>. Type <i>party accept</i> to join!`,
+          "msg-system",
+        );
         break;
       case "party_joined":
-        window.ui.log(`🤝 <strong>${Utils.escapeHtml(args[0])}</strong> joined the party <strong>${Utils.escapeHtml(args[1])}</strong>!`, "msg-system");
+        window.ui.log(
+          `🤝 <strong>${Utils.escapeHtml(args[0])}</strong> joined the party <strong>${Utils.escapeHtml(args[1])}</strong>!`,
+          "msg-system",
+        );
         break;
       case "party_left":
-        window.ui.log(`👋 <strong>${Utils.escapeHtml(args[0])}</strong> left the party <strong>${Utils.escapeHtml(args[1])}</strong>.`, "msg-system");
+        window.ui.log(
+          `👋 <strong>${Utils.escapeHtml(args[0])}</strong> left the party <strong>${Utils.escapeHtml(args[1])}</strong>.`,
+          "msg-system",
+        );
         break;
       case "party_kicked":
-        window.ui.log(`👢 <strong>${Utils.escapeHtml(args[0])}</strong> was kicked from <strong>${Utils.escapeHtml(args[1])}</strong>.`, "msg-system");
+        window.ui.log(
+          `👢 <strong>${Utils.escapeHtml(args[0])}</strong> was kicked from <strong>${Utils.escapeHtml(args[1])}</strong>.`,
+          "msg-system",
+        );
         break;
       case "party_disbanded":
-        window.ui.log(`💔 The party <strong>${Utils.escapeHtml(args[0])}</strong> has been disbanded.`, "msg-system");
+        window.ui.log(
+          `💔 The party <strong>${Utils.escapeHtml(args[0])}</strong> has been disbanded.`,
+          "msg-system",
+        );
         break;
       // ---------------------------
 
@@ -170,17 +340,26 @@ processEvent(ev) {
         const dest = args[2];
         const displayName = args[3] || moverId;
         if (moverId === this.currentActor) {
-          window.ui.log(`You moved <strong>${dir}</strong> to <strong>${Utils.formatId(dest)}</strong>.`, "msg-move");
+          window.ui.log(
+            `You moved <strong>${dir}</strong> to <strong>${Utils.formatId(dest)}</strong>.`,
+            "msg-move",
+          );
           this.send({ type: "cmd", text: "look" });
         } else {
-          window.ui.log(`<strong>${Utils.escapeHtml(Utils.formatName(displayName))}</strong> moved <strong>${dir}</strong>.`, "msg-move");
+          window.ui.log(
+            `<strong>${Utils.escapeHtml(Utils.formatName(displayName))}</strong> moved <strong>${dir}</strong>.`,
+            "msg-move",
+          );
           this.send({ type: "cmd", text: "look" });
         }
         break;
       }
       case "dead": {
         const deadName = Utils.formatName(args[1] || args[0]);
-        window.ui.log(`☠️ <strong>${deadName} HAS BEEN SLAIN!</strong>`, "msg-crime");
+        window.ui.log(
+          `☠️ <strong>${deadName} HAS BEEN SLAIN!</strong>`,
+          "msg-crime",
+        );
         if (args[0] === this.currentActor || args[1] === this.currentActor) {
           document.getElementById("death-overlay").style.display = "flex";
           if (!this.respawnTimer) {
@@ -196,22 +375,34 @@ processEvent(ev) {
       }
       case "respawned":
         document.getElementById("death-overlay").style.display = "none";
-        window.ui.log(`✨ <strong>You have been reborn in the Sanctuary.</strong>`, "msg-magic");
+        window.ui.log(
+          `✨ <strong>You have been reborn in the Sanctuary.</strong>`,
+          "msg-magic",
+        );
         this.send({ type: "cmd", text: "look" });
         this.send({ type: "cmd", text: "status" });
         break;
       case "looted":
-        window.ui.log(`Picked up <strong>x${args[2]} ${Utils.formatName(args[1])}</strong>.`, "msg-loot");
+        window.ui.log(
+          `Picked up <strong>x${args[2]} ${Utils.formatName(args[1])}</strong>.`,
+          "msg-loot",
+        );
         this.send({ type: "cmd", text: "inventory" });
         this.send({ type: "cmd", text: "look" });
         break;
       case "equipped":
       case "unequipped":
-        window.ui.log(`Equipment updated: <strong>${Utils.formatName(args[1])}</strong>.`, "msg-system");
+        window.ui.log(
+          `Equipment updated: <strong>${Utils.formatName(args[1])}</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "inventory" });
         break;
       case "used":
-        window.ui.log(`Used <strong>${Utils.formatName(args[1])}</strong>.`, "msg-system");
+        window.ui.log(
+          `Used <strong>${Utils.formatName(args[1])}</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "inventory" });
         this.send({ type: "cmd", text: "status" });
         break;
@@ -219,7 +410,10 @@ processEvent(ev) {
         window.ui.log(args[0], "msg-magic");
         break;
       case "allocated":
-        window.ui.log(`Trained <strong>${args[1].toUpperCase()}</strong> to <strong>${args[2]}</strong>.`, "msg-system");
+        window.ui.log(
+          `Trained <strong>${args[1].toUpperCase()}</strong> to <strong>${args[2]}</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "status" });
         break;
       case "xp_gained":
@@ -227,7 +421,10 @@ processEvent(ev) {
         this.send({ type: "cmd", text: "status" });
         break;
       case "lvl_up":
-        window.ui.log(`🌟 <strong>LEVEL UP! You reached Level ${args[1]}!</strong>`, "msg-heal");
+        window.ui.log(
+          `🌟 <strong>LEVEL UP! You reached Level ${args[1]}!</strong>`,
+          "msg-heal",
+        );
         this.send({ type: "cmd", text: "status" });
         break;
       case "env_msg":
@@ -241,22 +438,31 @@ processEvent(ev) {
         window.ui.log(args[1], "msg-system");
         break;
       case "bounty_gained":
-        window.ui.log(`🚨 <strong>CRIME COMMITTED!</strong> Bounty increased by <strong>${args[1]} Gold</strong>!`, "msg-crime");
+        window.ui.log(
+          `🚨 <strong>CRIME COMMITTED!</strong> Bounty increased by <strong>${args[1]} Gold</strong>!`,
+          "msg-crime",
+        );
         this.send({ type: "cmd", text: "status" });
         break;
       case "bounty_paid":
-        window.ui.log(`⚖️ Paid <strong>${args[1]} Gold</strong> to clear your criminal bounty. Hostilities ceased.`, "msg-system");
+        window.ui.log(
+          `⚖️ Paid <strong>${args[1]} Gold</strong> to clear your criminal bounty. Hostilities ceased.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "status" });
         this.send({ type: "cmd", text: "inventory" });
         this.send({ type: "cmd", text: "look" });
         break;
       case "bounty_claimed":
-        window.ui.log(`💰 <strong>${Utils.escapeHtml(args[0])}</strong> claimed a <strong>${args[2]} Gold</strong> bounty on <strong>${Utils.escapeHtml(args[1])}</strong>!`, "msg-loot");
+        window.ui.log(
+          `💰 <strong>${Utils.escapeHtml(args[0])}</strong> claimed a <strong>${args[2]} Gold</strong> bounty on <strong>${Utils.escapeHtml(args[1])}</strong>!`,
+          "msg-loot",
+        );
         this.send({ type: "cmd", text: "status" });
         break;
       case "bounty_report":
         let btyHtml = `<div style="border:1px solid var(--gold); padding:12px; margin:8px 0; background:var(--bg-surface); border-radius:6px;">
-                    <strong style="color:var(--gold);">--- MOST WANTED BOUNTIES ---</strong><br>`;
+                      <strong style="color:var(--gold);">--- MOST WANTED BOUNTIES ---</strong><br>`;
         if (args[1] && args[1].length) {
           args[1].forEach((entry, idx) => {
             btyHtml += `<div style="margin-top:6px;">${idx + 1}. <strong>${Utils.escapeHtml(entry.name || entry.id)}</strong> - <span style="color:var(--danger); font-weight:bold;">${entry.bounty} Gold</span></div>`;
@@ -272,84 +478,168 @@ processEvent(ev) {
 
         // --- NEW PARTY ERRORS ---
         if (errObj && errObj.type === "already_in_party") {
-            window.ui.log(`❌ You are already in a party!`, "msg-error");
+          window.ui.log(`❌ You are already in a party!`, "msg-error");
         } else if (errObj && errObj.type === "party_name_required") {
-            window.ui.log(`❌ You must specify a name for the party.`, "msg-error");
+          window.ui.log(
+            `❌ You must specify a name for the party.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "not_in_party") {
-            window.ui.log(`❌ You are not currently in a party.`, "msg-error");
+          window.ui.log(`❌ You are not currently in a party.`, "msg-error");
         } else if (errObj && errObj.type === "party_not_found") {
-            window.ui.log(`❌ Party not found. It may have been disbanded.`, "msg-error");
+          window.ui.log(
+            `❌ Party not found. It may have been disbanded.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "target_already_in_party") {
-            window.ui.log(`❌ ${Utils.escapeHtml(errObj.args[0])} is already in a party.`, "msg-error");
+          window.ui.log(
+            `❌ ${Utils.escapeHtml(errObj.args[0])} is already in a party.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "player_not_found") {
-            window.ui.log(`❌ Could not find player '${Utils.escapeHtml(errObj.args[0])}' in this room.`, "msg-error");
+          window.ui.log(
+            `❌ Could not find player '${Utils.escapeHtml(errObj.args[0])}' in this room.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "not_party_leader") {
-            window.ui.log(`❌ Only the party leader can do that.`, "msg-error");
+          window.ui.log(`❌ Only the party leader can do that.`, "msg-error");
         } else if (errObj && errObj.type === "no_pending_invite") {
-            window.ui.log(`❌ You have no pending party invitations.`, "msg-error");
+          window.ui.log(
+            `❌ You have no pending party invitations.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "cannot_kick_self") {
-            window.ui.log(`❌ You cannot kick yourself. Use 'party leave' instead.`, "msg-error");
+          window.ui.log(
+            `❌ You cannot kick yourself. Use 'party leave' instead.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "member_not_found") {
-            window.ui.log(`❌ Could not find party member '${Utils.escapeHtml(errObj.args[0])}'.`, "msg-error");
+          window.ui.log(
+            `❌ Could not find party member '${Utils.escapeHtml(errObj.args[0])}'.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "invalid_party_command") {
-            window.ui.log(`❌ Invalid party command. Use new, list, invite, accept, leave, or kick.`, "msg-error");
+          window.ui.log(
+            `❌ Invalid party command. Use new, list, invite, accept, leave, or kick.`,
+            "msg-error",
+          );
         }
         // ------------------------
-
         else if (errObj && errObj.type === "empty_message") {
-          window.ui.log(`❌ You open your mouth, but no words come out.`, "msg-error");
+          window.ui.log(
+            `❌ You open your mouth, but no words come out.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "already_have_summon") {
-          window.ui.log(`❌ You already command an active summon!`, "msg-error");
+          window.ui.log(
+            `❌ You already command an active summon!`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "item_not_found") {
-          window.ui.log(`❌ You do not have '${Utils.formatName(errObj.args[1])}' in your inventory!`, "msg-error");
+          window.ui.log(
+            `❌ You do not have '${Utils.formatName(errObj.args[1])}' in your inventory!`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "cannot_use") {
-          window.ui.log(`❌ You cannot use '${Utils.formatName(errObj.args[1])}'!`, "msg-error");
+          window.ui.log(
+            `❌ You cannot use '${Utils.formatName(errObj.args[1])}'!`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "cannot_equip") {
-          window.ui.log(`❌ You cannot equip '${Utils.formatName(errObj.args[1])}'!`, "msg-error");
+          window.ui.log(
+            `❌ You cannot equip '${Utils.formatName(errObj.args[1])}'!`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "cannot_trade_currency") {
           window.ui.log(`❌ You cannot trade currency directly!`, "msg-error");
         } else if (errObj && errObj.type === "merchant_not_found") {
-          window.ui.log(`❌ Could not find merchant '${Utils.escapeHtml(errObj.args[0])}' here.`, "msg-error");
+          window.ui.log(
+            `❌ Could not find merchant '${Utils.escapeHtml(errObj.args[0])}' here.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "merchant_out_of_stock") {
-          window.ui.log(`❌ The merchant doesn't have '${Utils.formatName(errObj.args[1])}' in stock.`, "msg-error");
+          window.ui.log(
+            `❌ The merchant doesn't have '${Utils.formatName(errObj.args[1])}' in stock.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "merchant_out_of_gold") {
-          window.ui.log(`❌ The merchant cannot afford this item.`, "msg-error");
+          window.ui.log(
+            `❌ The merchant cannot afford this item.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "insufficient_gold") {
-          window.ui.log(`❌ You need <strong style="color:var(--gold);">${errObj.args[1]}g</strong> to buy this item.`, "msg-error");
+          window.ui.log(
+            `❌ You need <strong style="color:var(--gold);">${errObj.args[1]}g</strong> to buy this item.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "invalid_password") {
           alert("Invalid Password!");
           window.ui.showOverlay();
         } else if (errObj && errObj.type === "safe_zone") {
-          window.ui.log(`🕊️ Violence is forbidden in this sanctuary.`, "msg-system");
+          window.ui.log(
+            `🕊️ Violence is forbidden in this sanctuary.`,
+            "msg-system",
+          );
         } else if (errObj && errObj.type === "account_does_not_exist") {
-          alert(`Account "${errObj.args[0]}" does not exist! Please register first.`);
+          alert(
+            `Account "${errObj.args[0]}" does not exist! Please register first.`,
+          );
           window.ui.showOverlay();
           window.ui.switchAuthTab("reg");
         } else if (errObj && errObj.type === "account_already_exists") {
-          alert(`Character name "${errObj.args[0]}" is already taken! Please choose another name.`);
+          alert(
+            `Character name "${errObj.args[0]}" is already taken! Please choose another name.`,
+          );
           window.ui.showOverlay();
           window.ui.switchAuthTab("reg");
         } else if (errObj && errObj.type === "restricted_race_denied") {
           window.ui.showOverlay();
           document.getElementById("reg-step-1").style.display = "block";
           document.getElementById("reg-step-2").style.display = "none";
-          document.getElementById("reg-err-1").innerText = "Admin Key rejected for Angel/Demon lineage!";
+          document.getElementById("reg-err-1").innerText =
+            "Admin Key rejected for Angel/Demon lineage!";
           document.getElementById("reg-err-1").style.display = "block";
         } else if (errObj && errObj.type === "stat_allocation_invalid") {
           window.ui.showOverlay();
-          document.getElementById("reg-err-2").innerText = "Invalid allocation!";
+          document.getElementById("reg-err-2").innerText =
+            "Invalid allocation!";
           document.getElementById("reg-err-2").style.display = "block";
         } else if (errObj && errObj.type === "cc_prevented") {
-          window.ui.log(`❌ You are <strong>${Utils.formatName(errObj.args[1])}</strong> and cannot act!`, "msg-error");
+          window.ui.log(
+            `❌ You are <strong>${Utils.formatName(errObj.args[1])}</strong> and cannot act!`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "spell_affinity_denied") {
-          window.ui.log(`❌ Your lineage lacks the affinity to cast <strong>${Utils.formatName(errObj.args[1])}</strong>.`, "msg-error");
+          window.ui.log(
+            `❌ Your lineage lacks the affinity to cast <strong>${Utils.formatName(errObj.args[1])}</strong>.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "not_in_wild") {
-          window.ui.log(`❌ You can only auto-walk in the wilderness.`, "msg-error");
+          window.ui.log(
+            `❌ You can only auto-walk in the wilderness.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "already_at_destination") {
           window.ui.log(`❌ You are already at that location!`, "msg-error");
         } else if (errObj && errObj.type === "invalid_walk_target") {
-          window.ui.log(`❌ That destination is not valid wilderness coordinates.`, "msg-error");
+          window.ui.log(
+            `❌ That destination is not valid wilderness coordinates.`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "not_walking") {
           window.ui.log(`❌ You are not currently auto-walking.`, "msg-error");
         } else if (errObj && errObj.type === "no_valid_targets") {
-          window.ui.l
+          window.ui.log(
+            `❌ No valid targets found for <strong>${Utils.formatName(errObj.args[1])}</strong>!`,
+            "msg-error",
+          );
+        } else {
+          window.ui.log(
+            `[ERROR] ${Utils.escapeHtml(JSON.stringify(args))}`,
+            "msg-error",
+          );
+        }
+        break;
+    }
+  }
+}
