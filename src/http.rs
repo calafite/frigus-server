@@ -25,6 +25,11 @@ impl WebServer {
             .route("/", get(Self::get_html))
             .route("/styles.css", get(Self::get_css))
             .route("/app.js", get(Self::get_js))
+            .route("/classes/AuthManager.js", get(Self::get_js_auth_manager))
+            .route("/classes/GameEngine.js", get(Self::get_js_game_engine))
+            .route("/classes/UIManager.js", get(Self::get_js_ui_manager))
+            .route("/utilities/constants.js", get(Self::get_js_constants))
+            .route("/utilities/utils.js", get(Self::get_js_utils))
             .route("/ws", get(Self::get_ws))
             .with_state(state);
 
@@ -51,6 +56,61 @@ impl WebServer {
 
     async fn get_js() -> impl IntoResponse {
         let js_str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/app.js"));
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+            js_str,
+        )
+    }
+
+    async fn get_js_auth_manager() -> impl IntoResponse {
+        let js_str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/static/classes/AuthManager.js"
+        ));
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+            js_str,
+        )
+    }
+
+    async fn get_js_game_engine() -> impl IntoResponse {
+        let js_str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/static/classes/GameEngine.js"
+        ));
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+            js_str,
+        )
+    }
+
+    async fn get_js_ui_manager() -> impl IntoResponse {
+        let js_str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/static/classes/UIManager.js"
+        ));
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+            js_str,
+        )
+    }
+
+    async fn get_js_constants() -> impl IntoResponse {
+        let js_str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/static/utilities/constants.js"
+        ));
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/javascript")],
+            js_str,
+        )
+    }
+
+    async fn get_js_utils() -> impl IntoResponse {
+        let js_str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/static/utilities/utils.js"
+        ));
         (
             [(axum::http::header::CONTENT_TYPE, "application/javascript")],
             js_str,

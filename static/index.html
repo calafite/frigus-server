@@ -258,6 +258,7 @@
         <div id="game-container">
             <header class="top-bar">
                 <div class="logo">FRIGUS <span>MUD</span></div>
+                <div id="header-clock" class="header-clock">🕒 08:00 (Spring)</div>
                 <div class="player-identity" id="header-identity">
                     Not Connected
                 </div>
@@ -304,7 +305,7 @@
                             </div>
                         </div>
 
-                        <!-- NEW: Afflictions Container -->
+                        <!-- Afflictions Container -->
                         <div id="self-affs" class="aff-container"></div>
                     </div>
                 </section>
@@ -353,10 +354,16 @@
                 <section class="panel-section">
                     <h3 class="section-title">Current Location</h3>
                     <div class="location-card">
-                        <h4 id="room-name" class="room-title">The Void</h4>
+                        <div class="location-header">
+                            <h4 id="room-name" class="room-title">The Void</h4>
+                            <span id="room-safe-badge" class="safe-badge" style="display: none;">🛡️ Safe Zone</span>
+                        </div>
                         <p id="room-desc" class="room-desc">
                             You are floating in emptiness.
                         </p>
+
+                        <div id="room-env-tags" class="env-tags-container"></div>
+
                         <div class="exits-container">
                             <span class="exits-label">Exits:</span>
                             <div id="room-exits" class="exits-list"></div>
