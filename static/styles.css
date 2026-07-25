@@ -428,6 +428,20 @@ body {
     box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
 }
 
+/* --- Realm Map Styles --- */
+#realm-map circle {
+    transition:
+        r 0.3s ease,
+        fill 0.3s ease,
+        stroke 0.3s ease;
+}
+#realm-map text {
+    transition:
+        fill 0.3s ease,
+        font-size 0.3s ease,
+        font-weight 0.3s ease;
+}
+
 /* --- Affliction UI Styles --- */
 .aff-container {
     display: flex;

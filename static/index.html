@@ -300,6 +300,223 @@
 
             <aside class="side-panel left-panel">
                 <section class="panel-section">
+                    <h3 class="section-title">Realm Map</h3>
+                    <div
+                        style="
+                            position: relative;
+                            width: 100%;
+                            text-align: center;
+                            margin-top: 4px;
+                        "
+                    >
+                        <svg
+                            id="realm-map"
+                            viewBox="0 0 240 200"
+                            style="
+                                width: 100%;
+                                height: auto;
+                                max-height: 180px;
+                                overflow: visible;
+                            "
+                        >
+                            <!-- Lines -->
+                            <line
+                                x1="120"
+                                y1="20"
+                                x2="120"
+                                y2="180"
+                                stroke="var(--border-light)"
+                                stroke-width="2"
+                                stroke-dasharray="4"
+                            />
+                            <line
+                                x1="50"
+                                y1="140"
+                                x2="190"
+                                y2="140"
+                                stroke="var(--border-light)"
+                                stroke-width="2"
+                                stroke-dasharray="4"
+                            />
+
+                            <!-- Nodes -->
+                            <!-- Frosthold -->
+                            <circle
+                                id="map-FR"
+                                cx="120"
+                                cy="20"
+                                r="6"
+                                fill="var(--bg-surface)"
+                                stroke="var(--text-muted)"
+                                stroke-width="2"
+                            />
+                            <text
+                                id="map-text-FR"
+                                x="132"
+                                y="24"
+                                fill="var(--text-muted)"
+                                font-size="11"
+                                font-family="var(--font-ui)"
+                                font-weight="600"
+                            >
+                                Frosthold
+                            </text>
+
+                            <!-- Sylvandell -->
+                            <circle
+                                id="map-SY"
+                                cx="120"
+                                cy="60"
+                                r="6"
+                                fill="var(--bg-surface)"
+                                stroke="var(--text-muted)"
+                                stroke-width="2"
+                            />
+                            <text
+                                id="map-text-SY"
+                                x="132"
+                                y="64"
+                                fill="var(--text-muted)"
+                                font-size="11"
+                                font-family="var(--font-ui)"
+                                font-weight="600"
+                            >
+                                Sylvandell
+                            </text>
+
+                            <!-- The Shire -->
+                            <circle
+                                id="map-SH"
+                                cx="120"
+                                cy="100"
+                                r="6"
+                                fill="var(--bg-surface)"
+                                stroke="var(--text-muted)"
+                                stroke-width="2"
+                            />
+                            <text
+                                id="map-text-SH"
+                                x="132"
+                                y="104"
+                                fill="var(--text-muted)"
+                                font-size="11"
+                                font-family="var(--font-ui)"
+                                font-weight="600"
+                            >
+                                The Shire
+                            </text>
+
+                            <!-- Crossroads -->
+                            <circle
+                                id="map-CR"
+                                cx="120"
+                                cy="140"
+                                r="6"
+                                fill="var(--bg-surface)"
+                                stroke="var(--text-muted)"
+                                stroke-width="2"
+                            />
+                            <text
+                                id="map-text-CR"
+                                x="132"
+                                y="152"
+                                fill="var(--text-muted)"
+                                font-size="11"
+                                font-family="var(--font-ui)"
+                                font-weight="600"
+                            >
+                                Crossroads
+                            </text>
+
+                            <!-- Highforge -->
+                            <circle
+                                id="map-HF"
+                                cx="50"
+                                cy="140"
+                                r="6"
+                                fill="var(--bg-surface)"
+                                stroke="var(--text-muted)"
+                                stroke-width="2"
+                            />
+                            <text
+                                id="map-text-HF"
+                                x="50"
+                                y="128"
+                                text-anchor="middle"
+                                fill="var(--text-muted)"
+                                font-size="11"
+                                font-family="var(--font-ui)"
+                                font-weight="600"
+                            >
+                                Highforge
+                            </text>
+
+                            <!-- Porthaven -->
+                            <circle
+                                id="map-PH"
+                                cx="190"
+                                cy="140"
+                                r="6"
+                                fill="var(--bg-surface)"
+                                stroke="var(--text-muted)"
+                                stroke-width="2"
+                            />
+                            <text
+                                id="map-text-PH"
+                                x="190"
+                                y="128"
+                                text-anchor="middle"
+                                fill="var(--text-muted)"
+                                font-size="11"
+                                font-family="var(--font-ui)"
+                                font-weight="600"
+                            >
+                                Porthaven
+                            </text>
+
+                            <!-- Sunfang Oasis -->
+                            <circle
+                                id="map-SU"
+                                cx="120"
+                                cy="180"
+                                r="6"
+                                fill="var(--bg-surface)"
+                                stroke="var(--text-muted)"
+                                stroke-width="2"
+                            />
+                            <text
+                                id="map-text-SU"
+                                x="132"
+                                y="184"
+                                fill="var(--text-muted)"
+                                font-size="11"
+                                font-family="var(--font-ui)"
+                                font-weight="600"
+                            >
+                                Sunfang
+                            </text>
+                        </svg>
+                        <div
+                            id="wild-indicator"
+                            style="
+                                display: none;
+                                position: absolute;
+                                bottom: 0;
+                                width: 100%;
+                                text-align: center;
+                                color: var(--gold);
+                                font-size: 0.85rem;
+                                font-weight: 700;
+                                background: rgba(24, 24, 27, 0.8);
+                                padding: 2px 0;
+                                border-radius: 4px;
+                            "
+                        >
+                            Exploring Wilderness...
+                        </div>
+                    </div>
+                </section>
+                <section class="panel-section">
                     <h3 class="section-title">Vitals</h3>
                     <div class="vitals-container">
                         <div class="bar-group">
