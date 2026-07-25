@@ -32,8 +32,6 @@ impl EngineNode {
 
         let ends_ws = ws_base.ends_with("/ws");
 
-        ends_ws
-            .then(|| ws_base.clone())
-            .unwrap_or_else(|| format!("{}/ws", ws_base))
+        if ends_ws { ws_base.clone() } else { format!("{}/ws", ws_base) }
     }
 }

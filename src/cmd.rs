@@ -45,17 +45,13 @@ impl CmdParser {
             "buy" => Some(json!({"type": "buy", "npc": arg1, "item": arg2})),
             "sell" => Some(json!({"type": "sell", "npc": arg1, "item": arg2})),
             "say" => {
-                let msg = text
-                    .splitn(2, char::is_whitespace)
-                    .nth(1)
+                let msg = text.split_once(char::is_whitespace).map(|x| x.1)
                     .unwrap_or("")
                     .trim();
                 Some(json!({ "type": "say", "text": msg }))
             }
             "p" | "party_say" => {
-                let msg = text
-                    .splitn(2, char::is_whitespace)
-                    .nth(1)
+                let msg = text.split_once(char::is_whitespace).map(|x| x.1)
                     .unwrap_or("")
                     .trim();
                 Some(json!({ "type": "party_say", "text": msg }))
