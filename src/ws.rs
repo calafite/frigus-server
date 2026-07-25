@@ -68,7 +68,6 @@ impl WsProxy {
 
             let kind = parsed.get("type").and_then(|t| t.as_str());
 
-            // Handle pre-login key validation queries by dialing Prolog engine
             if kind == Some("validate_key") {
                 let key = parsed.get("key").and_then(|k| k.as_str()).unwrap_or("");
                 let req = json!({
@@ -90,7 +89,6 @@ impl WsProxy {
                 continue;
             }
 
-            // Distinguish between explicit Login and Registration modes
             if kind == Some("login") || kind == Some("register") {
                 let mode = kind.unwrap().to_string();
                 let user = parsed.get("actor").and_then(|a| a.as_str())?.to_string();
