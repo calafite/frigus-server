@@ -26,6 +26,13 @@ impl CmdParser {
             "up" | "u" => Self::dir("up"),
             "down" | "d" => Self::dir("down"),
             "go" | "move" => Self::dir(arg1),
+            "walk" => {
+                let x = if arg1.is_empty() { "0" } else { arg1 };
+                let y = if arg2 == "none" { "0" } else { arg2 };
+                let z = iter.next().unwrap_or("0");
+                Some(json!({ "type": "walk", "target": format!("cell_{}_{}_{}", x, y, z) }))
+            }
+            "cancel_walk" | "stop" => Self::base("cancel_walk"),
             "kill" | "k" => Self::target("kill", arg1),
             "loot" | "get" | "take" | "g" => Self::target("loot", arg1),
             "train" | "allocate" => Self::target("allocate", arg1),

@@ -1,4 +1,4 @@
-import { Utils } from '../utilities/utils.js';
+import { Utils } from "../utilities/utils.js";
 
 export class GameEngine {
   constructor() {
@@ -101,54 +101,133 @@ export class GameEngine {
         window.ui.updateRoom(args[0], args[1], args[8], args[3], args[2]);
         window.ui.updateEntities(args[4], args[5]);
         window.ui.updateRoomItems(args[6]);
-        if (args[7]) window.ui.updateVitals(args[7].hp, args[7].max_hp, args[7].mp, args[7].max_mp, 0, 100, args[7].affs);
+        if (args[7])
+          window.ui.updateVitals(
+            args[7].hp,
+            args[7].max_hp,
+            args[7].mp,
+            args[7].max_mp,
+            0,
+            100,
+            args[7].affs,
+          );
         break;
       case "status_info":
-        window.ui.updateVitals(args[6].hp, args[6].max_hp, args[6].mp, args[6].max_mp, args[2], args[3], args[6].affs);
-        window.ui.updateStats(args[1], args[2], args[3], args[4], args[5], args[7]);
+        window.ui.updateVitals(
+          args[6].hp,
+          args[6].max_hp,
+          args[6].mp,
+          args[6].max_mp,
+          args[2],
+          args[3],
+          args[6].affs,
+        );
+        window.ui.updateStats(
+          args[1],
+          args[2],
+          args[3],
+          args[4],
+          args[5],
+          args[7],
+        );
         break;
       case "inventory_info":
         window.ui.updateInventory(args[1], args[2]);
         break;
+      case "walk_started":
+        window.ui.log(
+          `🚶 Auto-walk started towards <strong>${Utils.formatId(args[1])}</strong>.`,
+          "msg-system",
+        );
+        break;
+      case "walk_cancelled":
+        window.ui.log(`🛑 Auto-walk cancelled.`, "msg-system");
+        break;
+      case "walk_completed":
+        window.ui.log(
+          `✅ Arrived at destination: <strong>${Utils.formatId(args[1])}</strong>.`,
+          "msg-system",
+        );
+        this.send({ type: "cmd", text: "look" });
+        break;
       case "hit":
-        window.ui.log(`<strong>${Utils.escapeHtml(args[0])}</strong> struck <strong>${Utils.escapeHtml(args[1])}</strong> for <strong>${args[2]}</strong> damage! (${args[3]}/${args[4]} HP)`, "msg-combat");
+        window.ui.log(
+          `<strong>${Utils.escapeHtml(args[0])}</strong> struck <strong>${Utils.escapeHtml(args[1])}</strong> for <strong>${args[2]}</strong> damage! (${args[3]}/${args[4]} HP)`,
+          "msg-combat",
+        );
         break;
       case "crit":
-        window.ui.log(`💥 <strong>CRITICAL STRIKE!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> devastated <strong>${Utils.escapeHtml(args[1])}</strong> for <strong>${args[2]}</strong> damage! (${args[3]}/${args[4]} HP)`, "msg-combat-crit");
+        window.ui.log(
+          `💥 <strong>CRITICAL STRIKE!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> devastated <strong>${Utils.escapeHtml(args[1])}</strong> for <strong>${args[2]}</strong> damage! (${args[3]}/${args[4]} HP)`,
+          "msg-combat-crit",
+        );
         break;
       case "spell_crit":
-        window.ui.log(`🌟 <strong>SPELL CRITICAL!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> blasted <strong>${Utils.escapeHtml(args[2])}</strong> with <strong>${Utils.formatName(args[1])}</strong> for <strong>${args[3]}</strong> damage! (${args[4]}/${args[5]} HP)`, "msg-combat-crit");
+        window.ui.log(
+          `🌟 <strong>SPELL CRITICAL!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> blasted <strong>${Utils.escapeHtml(args[2])}</strong> with <strong>${Utils.formatName(args[1])}</strong> for <strong>${args[3]}</strong> damage! (${args[4]}/${args[5]} HP)`,
+          "msg-combat-crit",
+        );
         break;
       case "spell_missed":
-        window.ui.log(`🌫️ The dense mist causes <strong>${Utils.escapeHtml(args[0])}</strong>'s <strong>${Utils.formatName(args[1])}</strong> to fizzle and miss!`, "msg-dodge");
+        window.ui.log(
+          `🌫️ The dense mist causes <strong>${Utils.escapeHtml(args[0])}</strong>'s <strong>${Utils.formatName(args[1])}</strong> to fizzle and miss!`,
+          "msg-dodge",
+        );
         break;
       case "dodged":
-        window.ui.log(`⚡ <strong>${Utils.escapeHtml(args[0])}</strong> nimbly DODGED <strong>${Utils.escapeHtml(args[1])}</strong>'s attack!`, "msg-dodge");
+        window.ui.log(
+          `⚡ <strong>${Utils.escapeHtml(args[0])}</strong> nimbly DODGED <strong>${Utils.escapeHtml(args[1])}</strong>'s attack!`,
+          "msg-dodge",
+        );
         break;
       case "cast":
-        window.ui.log(`✨ <strong>${Utils.escapeHtml(args[0])}</strong> cast <strong>${Utils.formatName(args[1])}</strong> at <strong>${Utils.escapeHtml(args[2])}</strong>!`, "msg-magic");
+        window.ui.log(
+          `✨ <strong>${Utils.escapeHtml(args[0])}</strong> cast <strong>${Utils.formatName(args[1])}</strong> at <strong>${Utils.escapeHtml(args[2])}</strong>!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[3])}</span>`,
+          "msg-magic",
+        );
         break;
       case "cast_area":
-        window.ui.log(`🌩️ <strong>${Utils.escapeHtml(args[0])}</strong> conjured <strong>${Utils.formatName(args[1])}</strong>, engulfing the entire area!`, "msg-magic");
+        window.ui.log(
+          `🌩️ <strong>${Utils.escapeHtml(args[0])}</strong> conjured <strong>${Utils.formatName(args[1])}</strong>, engulfing the entire area!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[2])}</span>`,
+          "msg-magic",
+        );
         break;
       case "cast_group":
-        window.ui.log(`✨ <strong>${Utils.escapeHtml(args[0])}</strong> unleashed <strong>${Utils.formatName(args[1])}</strong> across the group!`, "msg-magic");
+        window.ui.log(
+          `✨ <strong>${Utils.escapeHtml(args[0])}</strong> unleashed <strong>${Utils.formatName(args[1])}</strong> across the group!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[2])}</span>`,
+          "msg-magic",
+        );
         break;
       case "cast_crit":
-        window.ui.log(`🌟 <strong>SPELL CRITICAL!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> empowered <strong>${Utils.formatName(args[1])}</strong>!`, "msg-magic");
+        window.ui.log(
+          `🌟 <strong>SPELL CRITICAL!</strong> <strong>${Utils.escapeHtml(args[0])}</strong> empowered <strong>${Utils.formatName(args[1])}</strong>!`,
+          "msg-magic",
+        );
         break;
       case "healed":
-        window.ui.log(`💚 <strong>${Utils.escapeHtml(args[0])}</strong> restored <strong>${args[1]}</strong> HP! (${args[2]}/${args[3]})`, "msg-heal");
+        window.ui.log(
+          `💚 <strong>${Utils.escapeHtml(args[0])}</strong> restored <strong>${args[1]}</strong> HP! (${args[2]}/${args[3]})`,
+          "msg-heal",
+        );
         break;
       case "aff_applied":
-        window.ui.log(`❇️ <strong>${Utils.formatName(args[1])}</strong> afflicted <strong>${Utils.escapeHtml(args[0])}</strong>!`, "msg-system");
+        window.ui.log(
+          `❇️ <strong>${Utils.formatName(args[1])}</strong> afflicted <strong>${Utils.escapeHtml(args[0])}</strong>!`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "look" });
         break;
       case "aff_tick":
-        window.ui.log(`🔥 <strong>${Utils.escapeHtml(args[0])}</strong> suffers <strong>${args[2]}</strong> damage from <strong>${Utils.formatName(args[1])}</strong>!`, "msg-dot");
+        window.ui.log(
+          `🔥 <strong>${Utils.escapeHtml(args[0])}</strong> suffers <strong>${args[2]}</strong> damage from <strong>${Utils.formatName(args[1])}</strong>!`,
+          "msg-dot",
+        );
         break;
       case "aff_faded":
-        window.ui.log(`💨 <strong>${Utils.formatName(args[1])}</strong> faded from <strong>${Utils.escapeHtml(args[0])}</strong>.`, "msg-system");
+        window.ui.log(
+          `💨 <strong>${Utils.formatName(args[1])}</strong> faded from <strong>${Utils.escapeHtml(args[0])}</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "look" });
         break;
       case "moved": {
@@ -157,17 +236,26 @@ export class GameEngine {
         const dest = args[2];
         const displayName = args[3] || moverId;
         if (moverId === this.currentActor) {
-          window.ui.log(`You moved <strong>${dir}</strong> to <strong>${Utils.formatId(dest)}</strong>.`, "msg-move");
+          window.ui.log(
+            `You moved <strong>${dir}</strong> to <strong>${Utils.formatId(dest)}</strong>.`,
+            "msg-move",
+          );
           this.send({ type: "cmd", text: "look" });
         } else {
-          window.ui.log(`<strong>${Utils.escapeHtml(Utils.formatName(displayName))}</strong> moved <strong>${dir}</strong>.`, "msg-move");
+          window.ui.log(
+            `<strong>${Utils.escapeHtml(Utils.formatName(displayName))}</strong> moved <strong>${dir}</strong>.`,
+            "msg-move",
+          );
           this.send({ type: "cmd", text: "look" });
         }
         break;
       }
       case "dead": {
         const deadName = Utils.formatName(args[1] || args[0]);
-        window.ui.log(`☠️ <strong>${deadName} HAS BEEN SLAIN!</strong>`, "msg-crime");
+        window.ui.log(
+          `☠️ <strong>${deadName} HAS BEEN SLAIN!</strong>`,
+          "msg-crime",
+        );
         if (args[0] === this.currentActor || args[1] === this.currentActor) {
           document.getElementById("death-overlay").style.display = "flex";
           if (!this.respawnTimer) {
@@ -183,22 +271,34 @@ export class GameEngine {
       }
       case "respawned":
         document.getElementById("death-overlay").style.display = "none";
-        window.ui.log(`✨ <strong>You have been reborn in the Sanctuary.</strong>`, "msg-magic");
+        window.ui.log(
+          `✨ <strong>You have been reborn in the Sanctuary.</strong>`,
+          "msg-magic",
+        );
         this.send({ type: "cmd", text: "look" });
         this.send({ type: "cmd", text: "status" });
         break;
       case "looted":
-        window.ui.log(`Picked up <strong>x${args[2]} ${Utils.formatName(args[1])}</strong>.`, "msg-loot");
+        window.ui.log(
+          `Picked up <strong>x${args[2]} ${Utils.formatName(args[1])}</strong>.`,
+          "msg-loot",
+        );
         this.send({ type: "cmd", text: "inventory" });
         this.send({ type: "cmd", text: "look" });
         break;
       case "equipped":
       case "unequipped":
-        window.ui.log(`Equipment updated: <strong>${Utils.formatName(args[1])}</strong>.`, "msg-system");
+        window.ui.log(
+          `Equipment updated: <strong>${Utils.formatName(args[1])}</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "inventory" });
         break;
       case "used":
-        window.ui.log(`Used <strong>${Utils.formatName(args[1])}</strong>.`, "msg-system");
+        window.ui.log(
+          `Used <strong>${Utils.formatName(args[1])}</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "inventory" });
         this.send({ type: "cmd", text: "status" });
         break;
@@ -206,7 +306,10 @@ export class GameEngine {
         window.ui.log(args[0], "msg-magic");
         break;
       case "allocated":
-        window.ui.log(`Trained <strong>${args[1].toUpperCase()}</strong> to <strong>${args[2]}</strong>.`, "msg-system");
+        window.ui.log(
+          `Trained <strong>${args[1].toUpperCase()}</strong> to <strong>${args[2]}</strong>.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "status" });
         break;
       case "xp_gained":
@@ -214,7 +317,10 @@ export class GameEngine {
         this.send({ type: "cmd", text: "status" });
         break;
       case "lvl_up":
-        window.ui.log(`🌟 <strong>LEVEL UP! You reached Level ${args[1]}!</strong>`, "msg-heal");
+        window.ui.log(
+          `🌟 <strong>LEVEL UP! You reached Level ${args[1]}!</strong>`,
+          "msg-heal",
+        );
         this.send({ type: "cmd", text: "status" });
         break;
       case "env_msg":
@@ -228,17 +334,26 @@ export class GameEngine {
         window.ui.log(args[1], "msg-system");
         break;
       case "bounty_gained":
-        window.ui.log(`🚨 <strong>CRIME COMMITTED!</strong> Bounty increased by <strong>${args[1]} Gold</strong>!`, "msg-crime");
+        window.ui.log(
+          `🚨 <strong>CRIME COMMITTED!</strong> Bounty increased by <strong>${args[1]} Gold</strong>!`,
+          "msg-crime",
+        );
         this.send({ type: "cmd", text: "status" });
         break;
       case "bounty_paid":
-        window.ui.log(`⚖️ Paid <strong>${args[1]} Gold</strong> to clear your criminal bounty. Hostilities ceased.`, "msg-system");
+        window.ui.log(
+          `⚖️ Paid <strong>${args[1]} Gold</strong> to clear your criminal bounty. Hostilities ceased.`,
+          "msg-system",
+        );
         this.send({ type: "cmd", text: "status" });
         this.send({ type: "cmd", text: "inventory" });
         this.send({ type: "cmd", text: "look" });
         break;
       case "bounty_claimed":
-        window.ui.log(`💰 <strong>${Utils.escapeHtml(args[0])}</strong> claimed a <strong>${args[2]} Gold</strong> bounty on <strong>${Utils.escapeHtml(args[1])}</strong>!`, "msg-loot");
+        window.ui.log(
+          `💰 <strong>${Utils.escapeHtml(args[0])}</strong> claimed a <strong>${args[2]} Gold</strong> bounty on <strong>${Utils.escapeHtml(args[1])}</strong>!`,
+          "msg-loot",
+        );
         this.send({ type: "cmd", text: "status" });
         break;
       case "bounty_report":
@@ -257,42 +372,86 @@ export class GameEngine {
       case "error":
         const errObj = args[0];
         if (errObj && errObj.type === "item_not_found") {
-          window.ui.log(`❌ You do not have '${Utils.formatName(errObj.args[1])}' in your inventory!`, "msg-error");
+          window.ui.log(
+            `❌ You do not have '${Utils.formatName(errObj.args[1])}' in your inventory!`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "cannot_use") {
-          window.ui.log(`❌ You cannot use '${Utils.formatName(errObj.args[1])}'!`, "msg-error");
+          window.ui.log(
+            `❌ You cannot use '${Utils.formatName(errObj.args[1])}'!`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "cannot_equip") {
-          window.ui.log(`❌ You cannot equip '${Utils.formatName(errObj.args[1])}'!`, "msg-error");
+          window.ui.log(
+            `❌ You cannot equip '${Utils.formatName(errObj.args[1])}'!`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "invalid_password") {
           alert("Invalid Password!");
           window.ui.showOverlay();
         } else if (errObj && errObj.type === "safe_zone") {
-          window.ui.log(`🕊️ Violence is forbidden in this sanctuary.`, "msg-system");
+          window.ui.log(
+            `🕊️ Violence is forbidden in this sanctuary.`,
+            "msg-system",
+          );
         } else if (errObj && errObj.type === "account_does_not_exist") {
-          alert(`Account "${errObj.args[0]}" does not exist! Please register first.`);
+          alert(
+            `Account "${errObj.args[0]}" does not exist! Please register first.`,
+          );
           window.ui.showOverlay();
           window.ui.switchAuthTab("reg");
         } else if (errObj && errObj.type === "account_already_exists") {
-          alert(`Character name "${errObj.args[0]}" is already taken! Please choose another name.`);
+          alert(
+            `Character name "${errObj.args[0]}" is already taken! Please choose another name.`,
+          );
           window.ui.showOverlay();
           window.ui.switchAuthTab("reg");
         } else if (errObj && errObj.type === "restricted_race_denied") {
           window.ui.showOverlay();
           document.getElementById("reg-step-1").style.display = "block";
           document.getElementById("reg-step-2").style.display = "none";
-          document.getElementById("reg-err-1").innerText = "Admin Key rejected for Angel/Demon lineage!";
+          document.getElementById("reg-err-1").innerText =
+            "Admin Key rejected for Angel/Demon lineage!";
           document.getElementById("reg-err-1").style.display = "block";
         } else if (errObj && errObj.type === "stat_allocation_invalid") {
           window.ui.showOverlay();
-          document.getElementById("reg-err-2").innerText = "Invalid allocation!";
+          document.getElementById("reg-err-2").innerText =
+            "Invalid allocation!";
           document.getElementById("reg-err-2").style.display = "block";
         } else if (errObj && errObj.type === "cc_prevented") {
-          window.ui.log(`❌ You are <strong>${Utils.formatName(errObj.args[1])}</strong> and cannot act!`, "msg-error");
+          window.ui.log(
+            `❌ You are <strong>${Utils.formatName(errObj.args[1])}</strong> and cannot act!`,
+            "msg-error",
+          );
         } else if (errObj && errObj.type === "spell_affinity_denied") {
-          window.ui.log(`❌ Your lineage lacks the affinity to cast <strong>${Utils.formatName(errObj.args[1])}</strong>.`, "msg-error");
+          window.ui.log(
+            `❌ Your lineage lacks the affinity to cast <strong>${Utils.formatName(errObj.args[1])}</strong>.`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "not_in_wild") {
+          window.ui.log(
+            `❌ You can only auto-walk in the wilderness.`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "already_at_destination") {
+          window.ui.log(`❌ You are already at that location!`, "msg-error");
+        } else if (errObj && errObj.type === "invalid_walk_target") {
+          window.ui.log(
+            `❌ That destination is not valid wilderness coordinates.`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "not_walking") {
+          window.ui.log(`❌ You are not currently auto-walking.`, "msg-error");
         } else if (errObj && errObj.type === "no_valid_targets") {
-          window.ui.log(`❌ No valid targets found for <strong>${Utils.formatName(errObj.args[1])}</strong>!`, "msg-error");
+          window.ui.log(
+            `❌ No valid targets found for <strong>${Utils.formatName(errObj.args[1])}</strong>!`,
+            "msg-error",
+          );
         } else {
-          window.ui.log(`[ERROR] ${Utils.escapeHtml(JSON.stringify(args))}`, "msg-error");
+          window.ui.log(
+            `[ERROR] ${Utils.escapeHtml(JSON.stringify(args))}`,
+            "msg-error",
+          );
         }
         break;
     }
