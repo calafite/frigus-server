@@ -40,6 +40,9 @@ impl CmdParser {
             "use" => Self::item("use", arg1),
             "unequip" => Self::slot("unequip", arg1),
             "cast" | "c" => Some(json!({"type": "cast", "spell": arg1, "target": arg2})),
+            "browse" | "shop" => Self::target("browse", arg1),
+            "buy" => Some(json!({"type": "buy", "npc": arg1, "item": arg2})),
+            "sell" => Some(json!({"type": "sell", "npc": arg1, "item": arg2})),
             _ => Self::json(text),
         }
     }

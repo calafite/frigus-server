@@ -164,10 +164,14 @@ export class UIManager {
       });
     }
     if (mobs && mobs.length > 0) {
+      const nonHostileTags = ["guard", "peasant", "merchant", "priest", "miner", "citizen"];
       mobs.forEach((m) => {
-        const isHostile = m.name.toLowerCase().includes("guard") ? "mob-neutral" : "mob-hostile";
+        const isHostile = m.hostile !== undefined
+          ? m.hostile
+          : !nonHostileTags.includes((m.tag || "").toLowerCase());
+        const mobClass = isHostile ? "mob-hostile" : "mob-neutral";
         const affsHtml = Utils.renderAffs(m.affs);
-        html += `<div class="list-item ${isHostile}"><div class="list-item-header"><span class="item-name">${Utils.formatName(m.name || m.tag)}</span><span class="item-meta">${m.hp}/${m.max_hp} HP</span></div><div class="entity-affs">${affsHtml}</div></div>`;
+        html += `<div class="list-item ${mobClass}"><div class="list-item-header"><span class="item-name">${Utils.formatName(m.name || m.tag)}</span><span class="item-meta">${m.hp}/${m.max_hp} HP</span></div><div class="entity-affs">${affsHtml}</div></div>`;
       });
     }
     if (!html) html = `<div style="color:var(--text-muted); font-style:italic;">No other beings present.</div>`;

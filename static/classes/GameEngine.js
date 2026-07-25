@@ -134,6 +134,31 @@ export class GameEngine {
       case "inventory_info":
         window.ui.updateInventory(args[1], args[2]);
         break;
+      case "browse_report": {
+        const npcName = args[1];
+        const items = args[2];
+        let browseHtml = `<div style="border: 1px solid var(--magic); padding: 12px; border-radius: 6px; background: var(--bg-surface); margin: 6px 0;">
+            <strong style="color: var(--magic);">--- ${Utils.escapeHtml(npcName)}'s Wares ---</strong><br>
+            <div style="margin-top: 8px; line-height: 1.6;">`;
+        if (items && items.length > 0) {
+            items.forEach(item => {
+                browseHtml += `&bull; <strong>${Utils.formatName(item.tag)}</strong> - <span style="color: var(--gold);">${item.price}g</span> <i>(Stock: ${item.qty})</i><br>`;
+            });
+        } else {
+            browseHtml += `<span style="color: var(--text-muted); font-style: italic;">Sold out.</span>`;
+        }
+        browseHtml += `</div></div>`;
+        window.ui.log(browseHtml, "msg-system");
+        break;
+      }
+      case "bought":
+        window.ui.log(`🛒 You bought <strong>${Utils.formatName(args[2])}</strong> from <strong>${Utils.escapeHtml(args[1])}</strong> for <strong style="color: var(--gold);">${args[3]}g</strong>.`, "msg-system");
+        this.send({ type: "cmd", text: "inventory" });
+        break;
+      case "sold":
+        window.ui.log(`🪙 You sold <strong>${Utils.formatName(args[2])}</strong> to <strong>${Utils.escapeHtml(args[1])}</strong> for <strong style="color: var(--gold);">${args[3]}g</strong>.`, "msg-system");
+        this.send({ type: "cmd", text: "inventory" });
+        break;
       case "walk_started":
         window.ui.log(
           `🚶 Auto-walk started towards <strong>${Utils.formatId(args[1])}</strong>.`,
@@ -197,6 +222,26 @@ export class GameEngine {
           `✨ <strong>${Utils.escapeHtml(args[0])}</strong> unleashed <strong>${Utils.formatName(args[1])}</strong> across the group!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[2])}</span>`,
           "msg-magic",
         );
+        break;
+      case "summoned":
+        window.ui.log(
+          `🌀 <strong>${Utils.escapeHtml(args[0])}</strong> cast <strong>${Utils.formatName(args[1])}</strong> and summoned a <strong>${Utils.formatName(args[2])}</strong>!<br><span style="color:var(--text-muted); font-style:italic;">${Utils.escapeHtml(args[3])}</span>`,
+          "msg-magic",
+        );
+        this.send({ type: "cmd", text: "look" });
+        break;
+      case "summon_failed":
+        window.ui.log(
+          `❌ <strong>${Utils.escapeHtml(args[0])}</strong> attempted to cast <strong>${Utils.formatName(args[1])}</strong>, but lacked the magical proficiency to manifest it!`,
+          "msg-error",
+        );
+        break;
+      case "summon_expired":
+        window.ui.log(
+          `💨 The summoned <strong>${Utils.formatName(args[0])}</strong> dissipates into mist.`,
+          "msg-system",
+        );
+        this.send({ type: "cmd", text: "look" });
         break;
       case "cast_crit":
         window.ui.log(
@@ -371,7 +416,12 @@ export class GameEngine {
         break;
       case "error":
         const errObj = args[0];
-        if (errObj && errObj.type === "item_not_found") {
+        if (errObj && errObj.type === "already_have_summon") {
+          window.ui.log(
+            `❌ You already command an active summon!`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "item_not_found") {
           window.ui.log(
             `❌ You do not have '${Utils.formatName(errObj.args[1])}' in your inventory!`,
             "msg-error",
@@ -384,6 +434,31 @@ export class GameEngine {
         } else if (errObj && errObj.type === "cannot_equip") {
           window.ui.log(
             `❌ You cannot equip '${Utils.formatName(errObj.args[1])}'!`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "cannot_trade_currency") {
+          window.ui.log(
+            `❌ You cannot trade currency directly!`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "merchant_not_found") {
+          window.ui.log(
+            `❌ Could not find merchant '${Utils.escapeHtml(errObj.args[0])}' here.`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "merchant_out_of_stock") {
+          window.ui.log(
+            `❌ The merchant doesn't have '${Utils.formatName(errObj.args[1])}' in stock.`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "merchant_out_of_gold") {
+          window.ui.log(
+            `❌ The merchant cannot afford this item.`,
+            "msg-error",
+          );
+        } else if (errObj && errObj.type === "insufficient_gold") {
+          window.ui.log(
+            `❌ You need <strong style="color:var(--gold);">${errObj.args[1]}g</strong> to buy this item.`,
             "msg-error",
           );
         } else if (errObj && errObj.type === "invalid_password") {

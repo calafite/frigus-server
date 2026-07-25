@@ -15,6 +15,7 @@ pub struct UserCreds {
     pub pass: String,
     pub key: String,
     pub race: String,
+    pub class: String,
     pub stats: Value,
 }
 
@@ -67,7 +68,7 @@ impl WsProxy {
 
             let kind = parsed.get("type").and_then(|t| t.as_str());
 
-            // Handle pre-login key validation queries by dialing Prolog
+            // Handle pre-login key validation queries by dialing Prolog engine
             if kind == Some("validate_key") {
                 let key = parsed.get("key").and_then(|k| k.as_str()).unwrap_or("");
                 let req = json!({
@@ -108,6 +109,11 @@ impl WsProxy {
                     .and_then(|r| r.as_str())
                     .unwrap_or("human")
                     .to_string();
+                let class = parsed
+                    .get("class")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("fighter")
+                    .to_string();
                 let stats = parsed.get("stats").cloned().unwrap_or_else(|| json!({}));
 
                 return Some(UserCreds {
@@ -116,6 +122,7 @@ impl WsProxy {
                     pass,
                     key,
                     race,
+                    class,
                     stats,
                 });
             }
@@ -138,6 +145,7 @@ impl WsProxy {
                 "pass": creds.pass,
                 "key": creds.key,
                 "race": creds.race,
+                "class": creds.class,
                 "stats": creds.stats
             })
         } else {

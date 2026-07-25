@@ -1,9 +1,17 @@
-import { onDOMReady } from '../utilities/utils.js';
-import { STATS_LIST } from '../utilities/constants.js';
+import { onDOMReady } from "../utilities/utils.js";
+import { STATS_LIST } from "../utilities/constants.js";
 
 export class AuthManager {
   constructor() {
-    this.allocStats = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, luk: 10 };
+    this.allocStats = {
+      str: 10,
+      dex: 10,
+      con: 10,
+      int: 10,
+      wis: 10,
+      cha: 10,
+      luk: 10,
+    };
     this.isEngineVerifiedAdmin = false;
     this.debounceTimer = null;
     this.setupListeners();
@@ -23,7 +31,10 @@ export class AuthManager {
             return;
           }
           this.debounceTimer = setTimeout(() => {
-            if (window.game.ws && window.game.ws.readyState === WebSocket.OPEN) {
+            if (
+              window.game.ws &&
+              window.game.ws.readyState === WebSocket.OPEN
+            ) {
               window.game.send({ type: "validate_key", key: keyVal });
             }
           }, 50);
@@ -107,7 +118,9 @@ export class AuthManager {
   }
 
   setStat(stat, rawVal) {
-    const key = document.getElementById("reg-key") ? document.getElementById("reg-key").value.trim() : "";
+    const key = document.getElementById("reg-key")
+      ? document.getElementById("reg-key").value.trim()
+      : "";
     const isAdmin = this.isEngineVerifiedAdmin || key.length > 0;
     const maxBudget = isAdmin ? 10000 : 15;
 
@@ -167,6 +180,7 @@ export class AuthManager {
     const name = document.getElementById("reg-name").value.trim();
     const pass = document.getElementById("reg-pass").value.trim();
     const race = document.getElementById("reg-race").value;
+    const charClass = document.getElementById("reg-class").value;
     const key = document.getElementById("reg-key").value.trim();
 
     window.game.authenticate({
@@ -175,6 +189,7 @@ export class AuthManager {
       pass: pass,
       key: key,
       race: race,
+      class: charClass,
       stats: this.allocStats,
     });
   }
