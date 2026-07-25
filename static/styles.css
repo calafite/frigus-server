@@ -744,6 +744,12 @@ body {
     color: #f97316;
     font-style: italic;
 }
+.msg-chat {
+    color: #f1f5f9;
+}
+.msg-chat strong {
+    color: var(--accent);
+}
 
 .command-bar {
     flex: 0 0 auto;

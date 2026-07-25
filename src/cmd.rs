@@ -43,6 +43,24 @@ impl CmdParser {
             "browse" | "shop" => Self::target("browse", arg1),
             "buy" => Some(json!({"type": "buy", "npc": arg1, "item": arg2})),
             "sell" => Some(json!({"type": "sell", "npc": arg1, "item": arg2})),
+            "say" => {
+                let msg = text
+                    .splitn(2, char::is_whitespace)
+                    .nth(1)
+                    .unwrap_or("")
+                    .trim();
+                Some(json!({ "type": "say", "text": msg }))
+            }
+            "party" => {
+                let sub = arg1; // e.g., 'new', 'invite', 'leave'
+                // Capture the rest of the string for names/player IDs
+                let target = text
+                    .splitn(3, char::is_whitespace)
+                    .nth(2)
+                    .unwrap_or("")
+                    .trim();
+                Some(json!({ "type": "party", "action": sub, "target": target }))
+            }
             _ => Self::json(text),
         }
     }
