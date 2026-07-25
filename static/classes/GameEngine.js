@@ -287,6 +287,12 @@ export class GameEngine {
           "msg-chat",
         );
         break;
+      case "party_chat":
+        window.ui.log(
+          `🟢 <strong style="color:var(--success);">[Party] ${Utils.escapeHtml(args[0])}</strong>: <span style="color:var(--success);">${Utils.escapeHtml(args[1])}</span>`,
+          "msg-chat",
+        );
+        break;
 
       // ---- NEW PARTY EVENTS ----
       case "party_created":
@@ -472,6 +478,34 @@ export class GameEngine {
         }
         btyHtml += `</div>`;
         window.ui.log(btyHtml, "msg-system");
+        break;
+
+      // STEALTH
+
+      case "stealth_success":
+        window.ui.log(
+          `🥷 <strong>${Utils.escapeHtml(args[0])}</strong> slipped into the area unnoticed...`,
+          "msg-system",
+        );
+        break;
+      case "stealth_spotted":
+        window.ui.log(
+          `⚠️ <strong>${Utils.escapeHtml(args[0])}</strong> was spotted!`,
+          "msg-error",
+        );
+        break;
+      case "stealth_revealed":
+        window.ui.log(
+          `🔎 <strong>${Utils.escapeHtml(args[0])}</strong> searched the area and REVEALED <strong>${Utils.escapeHtml(args[1])}</strong> from hiding!`,
+          "msg-crime",
+        );
+        this.send({ type: "cmd", text: "look" });
+        break;
+      case "search_nothing":
+        window.ui.log(
+          `🔍 <strong>${Utils.escapeHtml(args[0])}</strong> searched the area thoroughly, but found nothing hidden.`,
+          "msg-system",
+        );
         break;
       case "error":
         const errObj = args[0];

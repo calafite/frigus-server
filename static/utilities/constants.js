@@ -3,6 +3,7 @@ export const STATS_LIST = ["str", "dex", "con", "int", "wis", "cha", "luk"];
 export const BUFFS = [
   "shielded", "fortified", "divine_protection", "bloodlust",
   "empowered", "magic_barrier", "enraged", "regeneration", "thornskin",
+  "stealthed"
 ];
 
 export const CCS = [

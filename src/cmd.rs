@@ -19,6 +19,7 @@ impl CmdParser {
             "time" | "weather" | "env" => Self::base("time"),
             "respawn" => Self::base("respawn"),
             "help" | "h" | "?" => Self::base("local_help"),
+            "search" | "scan" | "find" => Self::base("search"),
             "north" | "n" => Self::dir("north"),
             "south" | "s" => Self::dir("south"),
             "east" | "e" => Self::dir("east"),
@@ -51,9 +52,16 @@ impl CmdParser {
                     .trim();
                 Some(json!({ "type": "say", "text": msg }))
             }
+            "p" | "party_say" => {
+                let msg = text
+                    .splitn(2, char::is_whitespace)
+                    .nth(1)
+                    .unwrap_or("")
+                    .trim();
+                Some(json!({ "type": "party_say", "text": msg }))
+            }
             "party" => {
-                let sub = arg1; // e.g., 'new', 'invite', 'leave'
-                // Capture the rest of the string for names/player IDs
+                let sub = arg1;
                 let target = text
                     .splitn(3, char::is_whitespace)
                     .nth(2)

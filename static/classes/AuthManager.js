@@ -88,7 +88,7 @@ export class AuthManager {
   renderStatAlloc(isAdmin) {
     const container = document.getElementById("stat-alloc-container");
     if (!container) return;
-    const maxBudget = isAdmin ? 10000 : 15;
+    const maxBudget = isAdmin ? 100000 : 15;
     let spent = 0;
     STATS_LIST.forEach((s) => (spent += this.allocStats[s] - 10));
     const rem = maxBudget - spent;
@@ -122,7 +122,7 @@ export class AuthManager {
       ? document.getElementById("reg-key").value.trim()
       : "";
     const isAdmin = this.isEngineVerifiedAdmin || key.length > 0;
-    const maxBudget = isAdmin ? 10000 : 15;
+    const maxBudget = isAdmin ? 100000 : 15;
 
     let val = parseInt(rawVal, 10);
     if (isNaN(val) || val < 10) val = 10;
