@@ -41,6 +41,10 @@ export class EventDispatcher {
         this.auth.isEngineVerifiedAdmin = args[2] === "valid";
         this.ui.updateKeyBadge(args[2]);
         this.auth.renderStatAlloc(this.auth.isEngineVerifiedAdmin);
+
+        // Auto-request fresh character status and room view once auth is verified
+        this.engine.sendCommand("status");
+        this.engine.sendCommand("look");
       },
 
       error: (args) => {
@@ -70,26 +74,38 @@ export class EventDispatcher {
       },
 
       status_info: (args) => {
-        this.ui.updateVitals(
-          args[6].hp,
-          args[6].max_hp,
-          args[6].mp,
-          args[6].max_mp,
-          args[2],
-          args[3],
-          args[6].affs,
-        );
+        // 1. Update Identity Header FIRST with defensive race/subrace formatting
+        const identElem = document.getElementById("header-identity");
+        if (identElem) {
+          const charName = Utils.escapeHtml(args[0] || this.engine.currentActor);
+          const race = args[8] ? Utils.formatName(args[8]) : "";
+          const subrace = args[9] ? Utils.formatName(args[9]) : "";
+          const raceStr = [race, subrace].filter(Boolean).join(" ");
+
+          identElem.innerText = raceStr ? `${charName} (${raceStr})` : charName;
+        }
+
+        // 2. Safely update Stats
         this.ui.updateStats(
           args[1],
           args[2],
           args[3],
           args[4],
           args[5],
-          args[7],
+          args[7]
         );
-        const identElem = document.getElementById("header-identity");
-        if (identElem && args[8]) {
-          identElem.innerText = `${Utils.escapeHtml(args[0])} (${Utils.formatName(args[8])} ${Utils.formatName(args[9] || "")})`;
+
+        // 3. Safely update Vitals (guards against undefined vitals object)
+        if (args[6]) {
+          this.ui.updateVitals(
+            args[6].hp,
+            args[6].max_hp,
+            args[6].mp,
+            args[6].max_mp,
+            args[2],
+            args[3],
+            args[6].affs || []
+          );
         }
       },
 
@@ -346,6 +362,13 @@ export class EventDispatcher {
       },
 
       // ITEMS & COMMERCE
+      insufficient_gold: (args) => {
+        this.ui.log(
+          `❌ You do not have enough gold! You need <strong style="color:var(--gold);">${args[1]}g</strong>.`,
+          "msg-error"
+        );
+      },
+
       looted: (args) => {
         this.ui.log(
           `Picked up <strong>x${args[2]} ${Utils.formatName(args[1])}</strong>.`,

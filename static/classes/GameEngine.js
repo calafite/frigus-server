@@ -10,12 +10,17 @@ export class GameEngine {
   constructor(ui = window.ui, auth = window.auth) {
     this.ui = ui;
     this.auth = auth;
+
     this.ws = null;
     this.currentActor = "";
     this.authPayload = null;
     this.respawnTimer = null;
+
+    // Sub-modules (located in /classes)
     this.timeManager = new TimeManager(this.ui);
     this.dispatcher = new EventDispatcher(this, this.ui, this.auth);
+
+    // Initialize clock ticker
     this.timeManager.start();
   }
 
@@ -39,6 +44,8 @@ export class GameEngine {
       this.ui.log("Connected to Frigus Realm.", "msg-system");
       if (this.authPayload) {
         this.send(this.authPayload);
+        this.sendCommand("look");
+        this.sendCommand("status");
       }
     };
 
@@ -72,32 +79,33 @@ export class GameEngine {
   }
 
   /**
-   * Convenience helper for sending standard textual commands.
-   * @param {string} text
+   * Polymorphic command handler.
+   * Supports both DOM submit events (`e.preventDefault()`) and raw string commands (`"look"`).
+   * @param {Event|string} param - DOM submit event OR command text string
    */
-  sendCommand(text) {
-    this.send({ type: "cmd", text });
-  }
+  sendCommand(param) {
+    if (param && typeof param === "object" && typeof param.preventDefault === "function") {
+      param.preventDefault();
+      const input = document.getElementById("cmd-input");
+      if (!input) return;
 
-  /**
-   * Form submit handler for command input.
-   * @param {Event} e - Form event object
-   */
-  handleCommandSubmit(e) {
-    if (e && e.preventDefault) e.preventDefault();
-    const input = document.getElementById("cmd-input");
-    if (!input) return;
+      const txt = input.value.trim();
+      if (!txt) return;
 
-    const txt = input.value.trim();
-    if (!txt) return;
+      this.ui.log(`&gt; ${Utils.escapeHtml(txt)}`, "msg-echo");
+      this.send({ type: "cmd", text: txt });
+      input.value = "";
+      return;
+    }
 
-    this.ui.log(`&gt; ${Utils.escapeHtml(txt)}`, "msg-echo");
-    this.sendCommand(txt);
-    input.value = "";
+    if (typeof param === "string" && param.trim().length > 0) {
+      this.send({ type: "cmd", text: param.trim() });
+    }
   }
 
   /**
    * Authenticates actor identity and connects socket.
+   * Sends initial 'look' and 'status' commands upon authentication.
    * @param {Object} payload
    */
   authenticate(payload) {
@@ -111,6 +119,10 @@ export class GameEngine {
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.send(payload);
+      setTimeout(() => {
+        this.sendCommand("status");
+        this.sendCommand("look");
+      }, 100);
     } else {
       this.connect();
     }

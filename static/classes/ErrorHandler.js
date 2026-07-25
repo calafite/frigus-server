@@ -85,8 +85,8 @@ const ERROR_REGISTRY = {
   merchant_out_of_gold: () => ({
     msg: "❌ The merchant cannot afford this item.",
   }),
-  insufficient_gold: (args) => ({
-    msg: `❌ You need <strong style="color:var(--gold);">${args[1]}g</strong> to buy this item.`,
+  no_bounty_to_pay: () => ({
+    msg: `❌ You do not have a bounty to pay off.`,
   }),
 
   // COMBAT / MAGIC ERRORS
