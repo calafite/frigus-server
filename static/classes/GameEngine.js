@@ -80,8 +80,7 @@ export class GameEngine {
     this.currentActor = payload.actor;
     this.authPayload = payload;
     const identElem = document.getElementById("header-identity");
-    if (identElem)
-      identElem.innerText = `${payload.actor} (${Utils.formatName(payload.race || "human")})`;
+    if (identElem) identElem.innerText = `${payload.actor} (Synchronizing...)`;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.send(payload);
     else this.connect();
     window.ui.hideOverlay();
@@ -130,6 +129,10 @@ export class GameEngine {
           args[5],
           args[7],
         );
+        const identElem = document.getElementById("header-identity");
+        if (identElem && args[8]) {
+          identElem.innerText = `${Utils.escapeHtml(args[0])} (${Utils.formatName(args[8])} ${Utils.formatName(args[9] || "")})`;
+        }
         break;
       case "inventory_info":
         window.ui.updateInventory(args[1], args[2]);
@@ -301,7 +304,7 @@ export class GameEngine {
         );
         break;
 
-      // ---- NEW PARTY EVENTS ----
+      // ---- PARTY EVENTS ----
       case "party_created":
         window.ui.log(
           `🎉 <strong>${Utils.escapeHtml(args[0])}</strong> formed the party <strong>${Utils.escapeHtml(args[1])}</strong>!`,
@@ -517,6 +520,7 @@ export class GameEngine {
       case "error":
         const errObj = args[0];
 
+        // --- QUEST ERRORS ---
         if (errObj && errObj.type === "no_quest_board") {
           window.ui.log(`❌ There is no quest board here.`, "msg-error");
         } else if (errObj && errObj.type === "quest_not_found") {
@@ -544,7 +548,8 @@ export class GameEngine {
             "msg-error",
           );
         }
-        // --- NEW PARTY ERRORS ---
+
+        // --- PARTY ERRORS ---
         else if (errObj && errObj.type === "already_in_party") {
           window.ui.log(`❌ You are already in a party!`, "msg-error");
         } else if (errObj && errObj.type === "party_name_required") {
@@ -592,7 +597,8 @@ export class GameEngine {
             "msg-error",
           );
         }
-        // ------------------------
+
+        // --- MISC ERRORS ---
         else if (errObj && errObj.type === "empty_message") {
           window.ui.log(
             `❌ You open your mouth, but no words come out.`,
