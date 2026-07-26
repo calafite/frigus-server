@@ -309,18 +309,22 @@ export class EventDispatcher {
           `☠️ <strong>${deadName} HAS BEEN SLAIN!</strong>`,
           "msg-crime",
         );
-        if (
-          args[0] === this.engine.currentActor ||
-          args[1] === this.engine.currentActor
-        ) {
+
+        // args[0] corresponds to the entity ID that died.
+        if (args[0] === this.engine.currentActor) {
           const overlay = document.getElementById("death-overlay");
-          if (overlay) overlay.style.display = "flex";
+          if (overlay) {
+            overlay.style.transition = "none";
+            overlay.style.opacity = "1";
+            overlay.style.display = "flex";
+          }
 
           if (!this.engine.respawnTimer) {
+            // Exactly 3 seconds
             this.engine.respawnTimer = setTimeout(() => {
               this.engine.respawnTimer = null;
-              this.engine.sendPayload({ type: "respawn" });
-            }, 3500);
+              this.engine.send({ type: "respawn" });
+            }, 3000);
           }
         } else {
           this.engine.sendCommand("look");
@@ -329,7 +333,16 @@ export class EventDispatcher {
 
       respawned: () => {
         const overlay = document.getElementById("death-overlay");
-        if (overlay) overlay.style.display = "none";
+        if (overlay) {
+          // Triggers a 1-second CSS fade-out for visual polish
+          overlay.style.transition = "opacity 1s ease-in-out";
+          overlay.style.opacity = "0";
+
+          setTimeout(() => {
+            overlay.style.display = "none";
+            overlay.style.transition = "none"; // Clean up transition for next time
+          }, 1000);
+        }
 
         this.ui.log(
           `✨ <strong>You have been reborn in the Sanctuary.</strong>`,
