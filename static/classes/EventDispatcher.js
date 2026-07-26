@@ -1,5 +1,5 @@
 import { Utils } from "../utilities/utils.js";
-import { ErrorHandler } from "../classes/errorHandler.js";
+import { ErrorHandler } from "../classes/ErrorHandler.js";
 
 export class EventDispatcher {
   /**
