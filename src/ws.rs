@@ -210,6 +210,10 @@ impl WsProxy {
                 break;
             }
         }
+
+        let drop_payload = json!({ "actor": user, "action": { "type": "disconnect" } });
+        let eng_msg = EngineNode::encode(&drop_payload);
+        let _ = eng_tx.send(eng_msg).await;
     }
 
     async fn pipe_eng(mut eng_rx: EngineRx, msg_tx: mpsc::UnboundedSender<WebMsg>) {
